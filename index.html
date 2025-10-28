@@ -443,7 +443,13 @@
     // ===== Emoji utilities =====
     function startsWithEmoji(str){ const s=(str||'').trim(); if(!s) return false; const cp=s.codePointAt(0); return (cp>=0x1F300&&cp<=0x1FAFF)||(cp>=0x2600&&cp<=0x27BF); }
     function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
-    function hasAny(label,words){ const l=norm(label); return words.some(w=>l.includes(w)); }
+    function hasAny(label,words){
+      const l=norm(label);
+      return words.some(w=> {
+        if(!w) return false;
+        return l.includes(norm(w));
+      });
+    }
 
     const emojiRules = [
       { words:['?'], e:'❓' }, { words:['!'], e:'❗' },
@@ -464,7 +470,7 @@
       { words:['captcha','captcha-prüfung'], e:'🤖' }, { words:['e-mail-spamfilter','spam','spamfilter'], e:'🚫' },
       { words:['kühlschrank','kuehlschrank','fridge'], e:'🧊' }, { words:['gefrierschrank','freezer'], e:'🧊' },
       { words:['herd','kochen','ofen','backofen'], e:'🍳' }, { words:['mikrowelle','microwave'], e:'🍽️' },
-      { words:['geschirrspüler','geschirrspueler','spülmaschine','spuelmaschine','spueler'], e:'🍽️' },
+      { words:['geschirrspüler','geschirrspueler','geschirrspuler','spülmaschine','spuelmaschine','spulmaschine','spueler','spuler'], e:'🍽️' },
       { words:['waschmaschine','trockner'], e:'🧺' }, { words:['kaffeeautomat','kaffeemaschine','kaffemaschine','kaffee','espresso'], e:'☕' },
       { words:['fernseher','tv'], e:'📺' }, { words:['thermostat','raum-thermostat','heizung'], e:'🌡️' }, { words:['rauchmelder','co2-melder','melder'], e:'🚨' },
       { words:['luftbefeuchter','humidifier'], e:'💧' }, { words:['smart-licht','straßenlaterne','strassenlaterne'], e:'💡' },
