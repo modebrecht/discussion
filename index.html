@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Classroom Discussion Board</title>
+  <style>
+    /* ===== Theme tokens (PAP style) ===== */
+    :root{
+      --bg:#f6f7fb;
+      --ink:#1f2937;
+      --muted:#6b7280;
+      --accent:#16a34a;    /* green */
+      --accent-2:#06b6d4;  /* cyan */
+      --panel:#46474A;     /* anthracite */
+      --panel-ink:#f1f5f9; /* light ink on panel */
+      --shadow:0 10px 30px rgba(0,0,0,.08);
+      --ring: 0 0 0 3px rgba(6, 182, 212, .35);
+      --radius: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+      --chip-font-scale: 1;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      min-height:100vh; margin:0; background:var(--bg); color:var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+    }
+
+    /* Header / toolbar */
+    .toolbar{background:#fff; box-shadow:var(--shadow);}
+    .toolbar-inner{max-width:64rem; margin:0 auto; padding:.75rem 1rem; display:flex; align-items:center; gap:.75rem}
+    .logo-pill{height:24px; width:24px; border-radius:12px; display:grid; place-items:center; font:600 12px/1.1 ui-sans-serif; background:var(--panel); color:var(--panel-ink)}
+    .title{font-weight:600; font-size:1.125rem; letter-spacing:.01em}
+    .font-controls{margin-inline-start:auto; display:flex; align-items:center; gap:.5rem}
+    .font-pct{opacity:.9; font-size:.75rem; line-height:1}
+
+    /* Layout */
+    .container{max-width:64rem; margin:0 auto; padding:0 1rem 4rem}
+    .card{margin-top:2rem; border:1px solid #e5e7eb; background:#fff; border-radius:var(--radius-lg); box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .card-body{padding:1rem}
+    .input-row{display:flex; flex-wrap:wrap; align-items:center; gap:.75rem}
+    .grow{flex:1 1 280px}
+    .options-row{margin-top:.75rem; display:flex; flex-wrap:wrap; align-items:center; gap:1rem}
+    .control-group{display:inline-flex; align-items:center; gap:.5rem}
+    .spacer{margin-inline-start:auto}
+
+    /* Inputs and buttons */
+    .input{width:100%; border:1px solid #d1d5db; border-radius:var(--radius); padding:.75rem 1rem; font-size:1rem; background:#fff; color:var(--ink)}
+    .input:focus{outline:none; border-color:#22d3ee; box-shadow:var(--ring)}
+
+    .btn{border:1px solid #e5e7eb; background:#f9fafb; color:#111827; border-radius:var(--radius); padding:.4rem .65rem; font-size:.875rem; font-weight:600; line-height:1.1; cursor:pointer}
+    .btn:hover{background:#f3f4f6}
+    .btn:focus{outline:none; box-shadow:var(--ring)}
+    .btn-primary{border-color:#9ee6f1; background:#e6fafd; color:#036c7d}
+    .btn-primary:hover{background:#d8f6fb}
+
+    .label{display:inline-flex; align-items:center; gap:.5rem; font-size:.875rem; user-select:none; color:#374151}
+
+    kbd{border:1px solid #d1d5db; border-radius:6px; padding:0 .25rem; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:.85em}
+
+    /* Chip list */
+    #list{display:flex; flex-wrap:wrap; gap:.75rem}
+
+    .chip{border:1px solid #e5e7eb; background:#fff; color:#1f2937; border-radius:18px; padding:.5rem 1rem; font-size:calc(.95rem * var(--chip-font-scale, 1)); font-weight:500; box-shadow:0 1px 2px rgba(0,0,0,.05); transition: padding .22s ease, font-size .22s ease, box-shadow .22s ease, background-color .22s ease, border-color .22s ease, transform .12s ease}
+    .chip:hover{box-shadow:0 6px 16px rgba(0,0,0,.08); transform:translateY(-1px); border-color:#67e8f9; background:#ecfeff}
+    .chip:focus{outline:none; box-shadow:var(--ring)}
+    .chip-colored:hover{filter:brightness(1.08)}
+
+    /* Grow behavior for spotlight (no overlap) */
+    .btn-item{transform-origin:center center}
+    .btn-item[aria-pressed="true"]{transform:none !important; z-index:10; font-size:calc(var(--fs, 1rem) * 2); padding:calc(var(--py, .5rem) * 2) calc(var(--px, 1rem) * 2)}
+    .btn-wrap{position:relative}
+
+    /* Tooltip */
+    .hint{position:relative}
+    .hint::after{content:attr(data-hint); position:absolute; inset-inline-start:0; inset-block-start:100%; margin-top:.35rem; white-space:nowrap; padding:.25rem .5rem; border-radius:6px; background:rgba(17,24,39,.9); color:#fff; font-size:.75rem; opacity:0; transform:translateY(-2px); pointer-events:none; transition:all .16s ease}
+    .hint:hover::after{opacity:1; transform:translateY(0)}
+
+    /* A11y helpers */
+    .sr-only{position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
+  </style>
+</head>
+<body>
+  <!-- Top bar / Toolbar -->
+  <header class="toolbar">
+    <div class="toolbar-inner">
+      <div style="display:flex; align-items:center; gap:.5rem">
+        <div class="logo-pill" title="Theme accent">D</div>
+        <h1 class="title">Discussion Board</h1>
+      </div>
+      <div class="font-controls">
+        <button id="decFont" class="btn hint" data-hint="Smaller font (F-)" type="button">F-</button>
+        <button id="incFont" class="btn hint" data-hint="Larger font (F+)" type="button">F+</button>
+        <span class="font-pct">Font: <strong id="fontPct">100%</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="container">
+    <section class="card">
+      <div class="card-body">
+        <div class="input-row">
+          <label for="topicInput" class="sr-only">Add discussion item</label>
+          <input id="topicInput" class="input grow" type="text" autocomplete="off" placeholder="Type an item and press Enter..." />
+          <button id="addBtn" type="button" class="btn btn-primary">Add</button>
+        </div>
+        <div class="options-row">
+          <label class="label" title="Give new chips a random background color"><input id="randColor" type="checkbox" checked> Random color</label>
+          <label class="label" title="Automatically prepend an emoji based on the text"><input id="autoEmoji" type="checkbox"> Auto emoji</label>
+          <div class="control-group">
+            <button id="reEmoji" type="button" title="Re-scan all chips and prepend emojis where missing" class="btn">Re-emoji</button>
+            <button id="decFont2" type="button" class="btn" title="Smaller chip font">F-</button>
+            <button id="incFont2" type="button" class="btn" title="Larger chip font">F+</button>
+          </div>
+        </div>
+      </div>
+      <p style="padding:0 1rem 1rem; margin:0; color:#6b7280; font-size:.9rem">Press <kbd>Enter</kbd> to add. Hotkeys: <kbd>Q</kbd> / <kbd>W</kbd> adjust chip font, <kbd>E</kbd> focuses the input. Click a chip to spotlight it (200% size). Options: <em>Random color</em>, <em>Auto emoji</em>, <em>Re-emoji</em>, and local <em>F-/F+</em> font controls.</p>
+    </section>
+
+    <section style="margin-top:1.5rem">
+      <div id="list"></div>
+    </section>
+  </main>
+
+  <script>
+    // ===== DOM refs =====
+    const list = document.getElementById('list');
+    const input = document.getElementById('topicInput');
+    const addBtn = document.getElementById('addBtn');
+    const randToggle = document.getElementById('randColor');
+    const emojiToggle = document.getElementById('autoEmoji');
+
+    const STORAGE_KEY = 'discussion.chips.v1';
+    const storage = (() => {
+      try { return typeof localStorage !== 'undefined' ? localStorage : null; }
+      catch (_) { return null; }
+    })();
+
+    const readStorage = (key) => {
+      if (!storage) return null;
+      try { return storage.getItem(key); }
+      catch (err) { console.warn('Local storage read failed:', err); return null; }
+    };
+
+    const writeStorage = (key, value) => {
+      if (!storage) return;
+      try { storage.setItem(key, value); }
+      catch (err) { console.warn('Local storage save failed:', err); }
+    };
+    const removeStorage = (key) => {
+      if (!storage) return;
+      try { storage.removeItem(key); }
+      catch (err) { console.warn('Local storage remove failed:', err); }
+    };
+
+    const isTypingContext = (el) => {
+      if (!el) return false;
+      if (el.isContentEditable) return true;
+      const tag = el.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    };
+
+    function refreshChipMetrics(){
+      if (!list) return;
+      list.querySelectorAll('.btn-item').forEach(btn => {
+        delete btn.dataset.metrics;
+        ensureMetrics(btn);
+      });
+    }
+
+    // ===== Font toolbar =====
+    const fontPct = document.getElementById('fontPct');
+    const chipScaleStep = 0.125;
+    const chipScaleMin = 0.75;
+    const chipScaleMax = 6;
+    let chipScale = 1;
+
+    const applyChipScale = () => {
+      document.documentElement.style.setProperty('--chip-font-scale', chipScale.toString());
+      if (fontPct) fontPct.textContent = Math.round(chipScale * 100) + '%';
+      refreshChipMetrics();
+    };
+
+    const adjustChipScale = (delta) => {
+      const next = Math.min(chipScaleMax, Math.max(chipScaleMin, chipScale + delta));
+      if (next === chipScale) return;
+      chipScale = next;
+      applyChipScale();
+    };
+
+    const incFontBtn = document.getElementById('incFont');
+    const decFontBtn = document.getElementById('decFont');
+    const incFont2 = document.getElementById('incFont2');
+    const decFont2 = document.getElementById('decFont2');
+    if (incFontBtn) incFontBtn.addEventListener('click', () => adjustChipScale(chipScaleStep));
+    if (decFontBtn) decFontBtn.addEventListener('click', () => adjustChipScale(-chipScaleStep));
+    if (incFont2) incFont2.addEventListener('click', () => adjustChipScale(chipScaleStep));
+    if (decFont2) decFont2.addEventListener('click', () => adjustChipScale(-chipScaleStep));
+    applyChipScale();
+
+    // ===== Hotkeys =====
+    document.addEventListener('keydown', (e) => {
+      if (isTypingContext(e.target) || e.altKey || e.ctrlKey || e.metaKey) return;
+      const key = e.key ? e.key.toLowerCase() : '';
+      if (key === 'q') {
+        e.preventDefault();
+        adjustChipScale(-chipScaleStep);
+      } else if (key === 'w') {
+        e.preventDefault();
+        adjustChipScale(chipScaleStep);
+      } else if (key === 'e') {
+        if (!input) return;
+        e.preventDefault();
+        input.focus();
+        if (typeof input.select === 'function') input.select();
+      }
+    });
+
+    // ===== Color utilities =====
+    function randomColorHex(){ return '#' + Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0'); }
+    function hexToRgb(hex){ const n = parseInt(hex.slice(1),16); return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 }; }
+    function srgbToLinear(u){ const c=u/255; return c<=0.03928? c/12.92 : Math.pow((c+0.055)/1.055,2.4); }
+    function luminance(rgb){ const {r,g,b}=rgb; return 0.2126*srgbToLinear(r)+0.7152*srgbToLinear(g)+0.0722*srgbToLinear(b); }
+    function shade(hex,percent){ const {r,g,b}=hexToRgb(hex); const f=v=>Math.min(255,Math.max(0,Math.round(v+(percent/100)*255))); const rr=f(r),gg=f(g),bb=f(b); return '#'+((1<<24)+(rr<<16)+(gg<<8)+bb).toString(16).slice(1).toUpperCase(); }
+    function setChipColor(btn, hex){
+      btn.style.backgroundColor = hex;
+      btn.classList.add('chip-colored');
+      const L = luminance(hexToRgb(hex));
+      const contrastBlack = (L+0.05)/0.05; const contrastWhite = 1.05/(L+0.05); const useBlack = contrastBlack>=contrastWhite;
+      btn.style.color = useBlack ? '#111827' : '#FFFFFF';
+      btn.style.borderColor = useBlack ? shade(hex,-20) : shade(hex,20);
+      btn.dataset.color = hex;
+    }
+    function clearChipColor(btn){
+      btn.style.backgroundColor = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+      btn.classList.remove('chip-colored');
+      delete btn.dataset.color;
+    }
+
+    // ===== Emoji utilities =====
+    function startsWithEmoji(str){ const s=(str||'').trim(); if(!s) return false; const cp=s.codePointAt(0); return (cp>=0x1F300&&cp<=0x1FAFF)||(cp>=0x2600&&cp<=0x27BF); }
+    function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+    function hasAny(label,words){ const l=norm(label); return words.some(w=>l.includes(w)); }
+
+    const emojiRules = [
+      { words:['?'], e:'❓' }, { words:['!'], e:'❗' },
+      { words:['webseite','website','homepage','web'], e:'🌐' },
+      { words:['youtube','yt'], e:'▶️' }, { words:['tiktok','tik tok'], e:'🎵' },
+      { words:['social','social-media','post'], e:'💬' }, { words:['app','apps'], e:'📱' }, { words:['online-shop','checkout','online-shopping'], e:'🛒' },
+      { words:['computer','pc','laptop','it','programm','programmieren','coding','code','javascript','html','css'], e:'💻' },
+      { words:['smartphone','handy','mobile','telefon','phone','handy-face-unlock','face-unlock'], e:'📱' },
+      { words:['kamera','camera','smartphone-kamera','hdr'], e:'📷' },
+      { words:['drucker','printer'], e:'🖨️' }, { words:['3d-drucker','3d drucker','3ddrucker','3dprinter'], e:'🖨️' },
+      { words:['scanner + ocr','ocr'], e:'🔤' }, { words:['scanner','scan'], e:'📠' }, { words:['kopierer','copy'], e:'🖨️' },
+      { words:['smartwatch','fitness-tracker','tracker','fitnesstracker'], e:'⌚' }, { words:['lautsprecher','speaker'], e:'🔊' },
+      { words:['kopfhoerer','kopfhörer','kopfhore','kopfhöhrer','headphones','headset'], e:'🎧' },
+      { words:['lampe','licht','smart-licht'], e:'💡' }, { words:['smart-plug','steckdose','steckdosenstecker'], e:'🔌' },
+      { words:['smart-waage','waage'], e:'⚖️' }, { words:['wlan','wifi','router','netzwerk','network','lan','netz'], e:'📶' },
+      { words:['gps-gerät','gps','gps-navigation','navigation'], e:'🧭' }, { words:['gegenstands-tracker','airtag','tile','tracker tag'], e:'📍' },
+      { words:['fingerabdrucksensor','fingerprint','biometrie','biometric'], e:'🔒' }, { words:['keycard-tür','keycard','rfid-tür'], e:'🔐' },
+      { words:['captcha','captcha-prüfung'], e:'🤖' }, { words:['e-mail-spamfilter','spam','spamfilter'], e:'🚫' },
+      { words:['kühlschrank','kuehlschrank','fridge'], e:'🧊' }, { words:['gefrierschrank','freezer'], e:'🧊' },
+      { words:['herd','kochen','ofen','backofen'], e:'🍳' }, { words:['mikrowelle','microwave'], e:'🍽️' },
+      { words:['geschirrspüler','geschirrspueler','spülmaschine','spuelmaschine','spueler'], e:'🍽️' },
+      { words:['waschmaschine','trockner'], e:'🧺' }, { words:['kaffeeautomat','kaffeemaschine','kaffemaschine','kaffee','espresso'], e:'☕' },
+      { words:['fernseher','tv'], e:'📺' }, { words:['thermostat','raum-thermostat','heizung'], e:'🌡️' }, { words:['rauchmelder','co2-melder','melder'], e:'🚨' },
+      { words:['luftbefeuchter','humidifier'], e:'💧' }, { words:['smart-licht','straßenlaterne','strassenlaterne'], e:'💡' },
+      { words:['bankautomat','atm'], e:'🏧' }, { words:['nfc-bezahlterminal','nfc','bezahlen','kredit-scoring','kredit','zahlung','bezahlung','terminal'], e:'💳' },
+      { words:['lift','aufzug'], e:'🛗' }, { words:['auto','fahrzeug','fahrzeugmotor'], e:'🚗' }, { words:['abstands-tempomat','tempomat','acc'], e:'🚘' },
+      { words:['ampel','verkehr'], e:'🚦' }, { words:['fahrkartenautomat','ticketautomat','fahrkarte'], e:'🎫' }, { words:['parkhaus-schranke','schranke'], e:'🚧' },
+      { words:['parkuhr-app','parkuhr','parking'], e:'🅿️' }, { words:['verkehrskontrolle','verkehrsradar','blitzer'], e:'🚓' },
+      { words:['e-ladestation','ladestation','ladestelle'], e:'🔌' }, { words:['solarpanel','pv','pv-wechselrichter','wechselrichter'], e:'☀️' }, { words:['windkraftanlage','wind'], e:'🌬️' },
+      { words:['bewässerungssystem','bewaesserung','bewasserung'], e:'💧' }, { words:['landwirtschaft','agri'], e:'🌾' }, { words:['recycling-anlage','recycling'], e:'♻️' }, { words:['wasseraufbereitung'], e:'💧' },
+      { words:['gesundheitswesen','patientenmonitor'], e:'🏥' }, { words:['thermometer'], e:'🌡️' }, { words:['blutdruckmessgerät','blutdruck'], e:'🩺' }, { words:['immunsystem'], e:'🛡️' }, { words:['sensor'], e:'📡' },
+      { words:['kasse im supermarkt','supermarkt-kasse','kasse'], e:'🛒' }, { words:['packstation','paket-tracking','paket','tracking'], e:'📦' }, { words:['bibliotheks-ausleihautomat','ausleihautomat','bibliothek'], e:'📚' },
+      { words:['schule','schule/bildung','bildung','studieren','lernen','lesson','chapter'], e:'📚' }, { words:['musik-empfehlung','musik','music','song','lied'], e:'🎵' }, { words:['übersetzungs-app','uebersetzungs-app','translate','translator','translation'], e:'🌐' },
+      { words:['pizza'], e:'🍕' }, { words:['farbe','color','paint','malen'], e:'🎨' }, { words:['haus','home','zuhause','wohnung'], e:'🏠' }, { words:['tanzen','dance'], e:'💃' }
+    ];
+
+    function detectEmoji(label){ if(label.includes('?')) return '❓'; if(label.includes('!')) return '❗'; for(const r of emojiRules) if(hasAny(label,r.words)) return r.e; return ''; }
+    function maybeAddEmoji(label){ if(!emojiToggle||!emojiToggle.checked) return label; if(startsWithEmoji(label)) return label; const em=detectEmoji(label); return em? (em+' '+label):label; }
+
+    // ===== Chip helpers =====
+    function ensureMetrics(btn){ if(btn.dataset.metrics==='1') return; const cs=getComputedStyle(btn); btn.style.setProperty('--fs', cs.fontSize); btn.style.setProperty('--px', cs.paddingLeft); btn.style.setProperty('--py', cs.paddingTop); btn.dataset.metrics='1'; }
+
+    function createChip(label, options = {}){
+      const wrap=document.createElement('div'); wrap.className='btn-wrap';
+      const btn=document.createElement('button'); btn.type='button'; btn.className='btn-item chip';
+      btn.dataset.label = label;
+      btn.textContent = maybeAddEmoji(label);
+      if(typeof options.displayText === 'string') btn.textContent = options.displayText;
+      btn.setAttribute('aria-pressed','false'); btn.title='Click to spotlight (toggle). Press Delete to remove';
+      if(options.color){
+        setChipColor(btn, options.color);
+      }else if(!options.skipRandom && randToggle && randToggle.checked){
+        setChipColor(btn, randomColorHex());
+      }else{
+        clearChipColor(btn);
+      }
+      btn.addEventListener('click',()=>{ ensureMetrics(btn); const expanded=btn.getAttribute('aria-pressed')==='true'; btn.setAttribute('aria-pressed', String(!expanded)); btn.focus(); saveChips(); });
+      btn.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); btn.click(); } else if(e.key==='Delete'){ e.preventDefault(); const host=btn.closest('.btn-wrap'); if(host){ host.remove(); saveChips(); } } });
+      wrap.appendChild(btn); return wrap;
+    }
+
+    function saveChips(){
+      if(!list) return;
+      const payload = [];
+      list.querySelectorAll('.btn-item').forEach(btn=>{
+        const raw = (btn.dataset.label || '').trim();
+        if(!raw) return;
+        payload.push({
+          label: raw,
+          color: btn.dataset.color || null,
+          pressed: btn.getAttribute('aria-pressed')==='true',
+          display: btn.textContent || ''
+        });
+      });
+      if(payload.length){
+        writeStorage(STORAGE_KEY, JSON.stringify(payload));
+      }else{
+        removeStorage(STORAGE_KEY);
+      }
+    }
+
+    function loadChips(){
+      if(!list) return;
+      const raw = readStorage(STORAGE_KEY);
+      if(!raw) return;
+      let parsed;
+      try{ parsed = JSON.parse(raw); }
+      catch(err){ console.warn('Local storage parse failed:', err); return; }
+      if(!Array.isArray(parsed)) return;
+      parsed.forEach(item=>{
+        if(!item || typeof item.label!=='string') return;
+        const text = item.label.trim();
+        if(!text) return;
+        const display = typeof item.display==='string' ? item.display : undefined;
+        const node=createChip(text, { color: item.color || undefined, skipRandom: true, displayText: display });
+        list.appendChild(node);
+        const btn=node.querySelector('.btn-item');
+        if(btn && item.pressed){
+          ensureMetrics(btn);
+          btn.setAttribute('aria-pressed','true');
+        }
+      });
+    }
+
+    function addFromInput(){
+      const value=input.value.trim();
+      if(!value) return;
+      const node=createChip(value);
+      list.appendChild(node);
+      saveChips();
+      input.value='';
+      input.focus();
+    }
+    loadChips();
+    addBtn.addEventListener('click', addFromInput);
+    input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); addFromInput(); } });
+
+    // Delete key removes focused/selected chip
+    document.addEventListener('keydown', (e)=>{
+      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active=document.activeElement; if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const host=active.closest('.btn-wrap'); if(host){ host.remove(); saveChips(); } input.focus(); return; }
+      const selected=list.querySelector('.btn-item[aria-pressed="true"]'); if(selected){ e.preventDefault(); const host=selected.closest('.btn-wrap'); if(host){ host.remove(); saveChips(); } input.focus(); }
+    });
+
+    // Re-emoji existing chips
+    const reEmojiBtn=document.getElementById('reEmoji');
+    if(reEmojiBtn){ reEmojiBtn.addEventListener('click', ()=>{ let changed=0; list.querySelectorAll('.btn-item').forEach(btn=>{ const txt=btn.textContent||''; if(!startsWithEmoji(txt)){ const em=detectEmoji(txt); if(em){ btn.textContent=em+' '+txt; changed++; } } }); try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){} reEmojiBtn.title = changed? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)'; saveChips(); }); }
+
+    // ===== Smoke tests (manual) =====
+    function runSmokeTests(){ try{ const before=list.children.length; if(emojiToggle) emojiToggle.checked=true; ['Bug','Kaffeemaschine','Lift','YouTube','TikTok','Webseite','Computer','Netzwerk','Drucker'].forEach(t=>{ input.value=t; addFromInput(); }); const after=list.children.length; console.assert(after>=before+9, 'Should add 9 chips'); const first=list.querySelector('.btn-item'); console.assert(first && /\p{Extended_Pictographic}/u.test(first.textContent.trim().charAt(0))===true, 'First chip should start with an emoji'); first.click(); console.assert(first.getAttribute('aria-pressed')==='true','Chip should be spotlighted'); document.getElementById('reEmoji').click(); console.assert(/^\p{Extended_Pictographic}\s/u.test(first.textContent)===true,'Re-emoji should keep single leading emoji'); }catch(e){ console.warn('Smoke tests issue (non-fatal):', e); } }
+    try{ if(new URLSearchParams(location.search).get('tests')==='1') runSmokeTests(); }catch(_){ }
+  </script>
+</body>
+</html>
