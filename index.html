@@ -130,6 +130,14 @@
             <button id="decFont2" type="button" class="btn" title="Smaller chip font">F-</button>
             <button id="incFont2" type="button" class="btn" title="Larger chip font">F+</button>
           </div>
+          <div class="control-group" style="gap:.75rem">
+            <label class="label" style="gap:.35rem" title="Adjust pill base size"><span>Size</span>
+              <input id="chipSize" type="range" min="0.6" max="6" step="0.005" value="1" />
+            </label>
+            <label class="label" style="gap:.35rem" title="Adjust spacing between pills"><span>Spacing</span>
+              <input id="chipMargin" type="range" min="0" max="32" step="1" value="8" />
+            </label>
+          </div>
           <div class="control-group">
             <button id="exportBtn" type="button" class="btn" title="Download chips as JSON">Export JSON</button>
             <button id="importBtn" type="button" class="btn" title="Import chips from JSON">Import JSON</button>
@@ -137,7 +145,7 @@
           </div>
         </div>
       </div>
-      <p style="padding:0 1rem 1rem; margin:0; color:#6b7280; font-size:.9rem">Press <kbd>Enter</kbd> to add. Hotkeys: <kbd>Q</kbd> / <kbd>W</kbd> adjust chip font, <kbd>E</kbd> focuses the input. Click a chip to spotlight it (200% size). Options: <em>Random color</em>, <em>Auto emoji</em>, <em>Re-emoji</em>, local <em>F-/F+</em> font controls, plus JSON <em>Export/Import</em>.</p>
+      <p style="padding:0 1rem 1rem; margin:0; color:#6b7280; font-size:.9rem">Press <kbd>Enter</kbd> to add. Hotkeys: <kbd>Q</kbd> / <kbd>W</kbd> adjust chip font, <kbd>E</kbd> focuses the input. Click a chip to spotlight it (200% size). Options: <em>Random color</em>, <em>Auto emoji</em>, <em>Re-emoji</em>, local <em>F-/F+</em> font controls, <em>Size</em>/<em>Spacing</em> sliders, plus JSON <em>Export/Import</em>.</p>
     </section>
 
     <section style="margin-top:1.5rem">
@@ -155,10 +163,13 @@
     const exportBtn = document.getElementById('exportBtn');
     const importBtn = document.getElementById('importBtn');
     const importFileInput = document.getElementById('importFile');
+    const chipSizeInput = document.getElementById('chipSize');
+    const chipMarginInput = document.getElementById('chipMargin');
 
     const STORAGE_KEY = 'discussion.chips.v1';
+    const SETTINGS_KEY = 'discussion.settings.v1';
     const EXPORT_FILENAME = 'discussion-chips.json';
-    const layoutConfig = { step: 4, gutter: 8 };
+    const layoutConfig = { step: 4, gutter: 8, chipScale: 1 };
     const raf = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
       ? window.requestAnimationFrame.bind(window)
       : (cb) => setTimeout(cb, 16);
@@ -185,7 +196,51 @@
       catch (err) { console.warn('Local storage remove failed:', err); }
     };
 
-    function layoutChipsNow(){
+    const defaultSettings = { chipScale: 1, gutter: 8 };
+    const sliderBounds = {
+      size: chipSizeInput ? {
+        min: parseFloat(chipSizeInput.min) || defaultSettings.chipScale,
+        max: parseFloat(chipSizeInput.max) || defaultSettings.chipScale,
+        step: parseFloat(chipSizeInput.step) || 0.005
+      } : { min: defaultSettings.chipScale, max: defaultSettings.chipScale, step: 0.005 },
+      margin: chipMarginInput ? {
+        min: parseFloat(chipMarginInput.min) || defaultSettings.gutter,
+        max: parseFloat(chipMarginInput.max) || defaultSettings.gutter,
+        step: parseFloat(chipMarginInput.step) || 1
+      } : { min: defaultSettings.gutter, max: defaultSettings.gutter, step: 1 }
+    };
+
+    const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value));
+
+    function loadSettings(){
+      const raw = readStorage(SETTINGS_KEY);
+      if(!raw) return { ...defaultSettings };
+      try{
+        const parsed = JSON.parse(raw);
+        return { ...defaultSettings, ...parsed };
+      }catch(err){
+        console.warn('Settings parse failed:', err);
+        return { ...defaultSettings };
+      }
+    }
+
+    let settingsReady = false;
+
+    function persistSettings(){
+      if(!settingsReady) return;
+      const payload = {
+        chipScale: Number(chipScale.toFixed(3)),
+        gutter: Math.round(layoutConfig.gutter)
+      };
+      writeStorage(SETTINGS_KEY, JSON.stringify(payload));
+    }
+
+    const uiSettings = loadSettings();
+    layoutConfig.gutter = clampNumber(uiSettings.gutter, sliderBounds.margin.min, sliderBounds.margin.max);
+    layoutConfig.step = Math.max(2, Math.min(8, Math.round(layoutConfig.gutter / 2))) || layoutConfig.step;
+    if(chipMarginInput) chipMarginInput.value = String(Math.round(layoutConfig.gutter));
+
+    function layoutChipsNow({ reorder = false } = {}){
       if(!list) return;
       const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement);
       if(!wraps.length){
@@ -206,9 +261,10 @@
         list.style.height = '0px';
         return;
       }
-      const placed = [];
+      const targets = reorder ? [...wraps].sort((a, b) => b.offsetHeight - a.offsetHeight || b.offsetWidth - a.offsetWidth) : wraps;
       let maxHeight = 0;
-      wraps.forEach(wrap => {
+      const placed = [];
+      targets.forEach(wrap => {
         if(!(wrap instanceof HTMLElement)) return;
         const itemWidth = wrap.offsetWidth;
         const itemHeight = wrap.offsetHeight;
@@ -242,12 +298,12 @@
       list.style.height = padTop + Math.max(0, maxHeight + padBottom) + 'px';
     }
 
-    function scheduleLayout(){
+    function scheduleLayout(reorder = false){
       if(layoutScheduled) return;
       layoutScheduled = true;
       raf(() => {
         layoutScheduled = false;
-        layoutChipsNow();
+        layoutChipsNow({ reorder });
       });
     }
 
@@ -268,7 +324,7 @@
         delete btn.dataset.metrics;
         ensureMetrics(btn);
       });
-      scheduleLayout();
+      scheduleLayout(true);
     }
 
     // ===== Font toolbar =====
@@ -276,10 +332,18 @@
     const chipScaleStep = 0.125;
     const chipScaleMin = 0.75;
     const chipScaleMax = 6;
-    let chipScale = 1;
+    const sizeStep = sliderBounds.size.step || 0.005;
+    let chipScale = clampNumber(uiSettings.chipScale, sliderBounds.size.min, sliderBounds.size.max);
+    chipScale = Math.round(chipScale / sizeStep) * sizeStep;
+    layoutConfig.chipScale = chipScale;
+    if(chipSizeInput) chipSizeInput.value = chipScale.toFixed(3);
 
     const applyChipScale = () => {
       document.documentElement.style.setProperty('--chip-font-scale', chipScale.toString());
+      layoutConfig.chipScale = chipScale;
+      if (chipSizeInput && document.activeElement !== chipSizeInput){
+        chipSizeInput.value = chipScale.toFixed(3);
+      }
       if (fontPct) fontPct.textContent = Math.round(chipScale * 100) + '%';
       refreshChipMetrics();
     };
@@ -290,6 +354,7 @@
       if (next === chipScale) return;
       chipScale = next;
       applyChipScale();
+      persistSettings();
     };
 
     const incFontBtn = document.getElementById('incFont');
@@ -301,6 +366,40 @@
     if (incFont2) incFont2.addEventListener('click', () => adjustChipScale(chipScaleStep));
     if (decFont2) decFont2.addEventListener('click', () => adjustChipScale(-chipScaleStep));
     applyChipScale();
+
+    const updateGutter = (value) => {
+      const clamped = Math.round(clampNumber(value, sliderBounds.margin.min, sliderBounds.margin.max));
+      if(clamped === Math.round(layoutConfig.gutter) && Math.abs(clamped - layoutConfig.gutter) < 0.5) return false;
+      layoutConfig.gutter = clamped;
+      layoutConfig.step = Math.max(2, Math.min(8, Math.round(layoutConfig.gutter / 2))) || layoutConfig.step;
+      if(chipMarginInput){
+        chipMarginInput.value = String(clamped);
+      }
+      scheduleLayout(true);
+      return true;
+    };
+
+    if (chipSizeInput){
+      chipSizeInput.addEventListener('input', () => {
+        const raw = parseFloat(chipSizeInput.value);
+        if (!Number.isFinite(raw)) return;
+        const clamped = clampNumber(raw, sliderBounds.size.min, sliderBounds.size.max);
+        const snapped = Math.round(clamped / sizeStep) * sizeStep;
+        if (!Number.isFinite(snapped) || Math.abs(snapped - chipScale) < 1e-4) return;
+        chipSizeInput.value = snapped.toFixed(3);
+        chipScale = snapped;
+        applyChipScale();
+        persistSettings();
+      });
+    }
+
+    if (chipMarginInput){
+      chipMarginInput.addEventListener('input', () => {
+        const value = parseFloat(chipMarginInput.value);
+        if(!Number.isFinite(value)) return;
+        if(updateGutter(value)) persistSettings();
+      });
+    }
 
     // ===== Hotkeys =====
     document.addEventListener('keydown', (e) => {
@@ -403,8 +502,8 @@
       }else{
         clearChipColor(btn);
       }
-      btn.addEventListener('click',()=>{ ensureMetrics(btn); const expanded=btn.getAttribute('aria-pressed')==='true'; btn.setAttribute('aria-pressed', String(!expanded)); btn.focus(); scheduleLayout(); saveChips(); });
-      btn.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); btn.click(); } else if(e.key==='Delete'){ e.preventDefault(); const host=btn.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(); saveChips(); } } });
+      btn.addEventListener('click',()=>{ ensureMetrics(btn); const expanded=btn.getAttribute('aria-pressed')==='true'; btn.setAttribute('aria-pressed', String(!expanded)); btn.focus(); scheduleLayout(true); saveChips(); });
+      btn.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); btn.click(); } else if(e.key==='Delete'){ e.preventDefault(); const host=btn.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(true); saveChips(); } } });
       wrap.appendChild(btn); return wrap;
     }
 
@@ -455,7 +554,7 @@
       refreshChipMetrics();
       saveChips();
       if(input) input.focus();
-      scheduleLayout();
+      scheduleLayout(true);
     }
 
     function loadChips(){
@@ -468,7 +567,7 @@
       if(!Array.isArray(parsed)) return;
       parsed.forEach(appendChipFromData);
       refreshChipMetrics();
-      scheduleLayout();
+      scheduleLayout(true);
     }
 
     function addFromInput(){
@@ -476,13 +575,15 @@
       if(!value) return;
       const node=createChip(value);
       list.appendChild(node);
-      scheduleLayout();
+      scheduleLayout(true);
       saveChips();
       input.value='';
       input.focus();
     }
     loadChips();
-    scheduleLayout();
+    scheduleLayout(true);
+    settingsReady = true;
+    persistSettings();
 
     if(exportBtn){
       exportBtn.addEventListener('click', ()=>{
@@ -535,13 +636,13 @@
 
     // Delete key removes focused/selected chip
     document.addEventListener('keydown', (e)=>{
-      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active=document.activeElement; if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const host=active.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(); saveChips(); } input.focus(); return; }
-      const selected=list.querySelector('.btn-item[aria-pressed="true"]'); if(selected){ e.preventDefault(); const host=selected.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(); saveChips(); } input.focus(); }
+      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active=document.activeElement; if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const host=active.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(true); saveChips(); } input.focus(); return; }
+      const selected=list.querySelector('.btn-item[aria-pressed="true"]'); if(selected){ e.preventDefault(); const host=selected.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(true); saveChips(); } input.focus(); }
     });
 
     // Re-emoji existing chips
     const reEmojiBtn=document.getElementById('reEmoji');
-    if(reEmojiBtn){ reEmojiBtn.addEventListener('click', ()=>{ let changed=0; list.querySelectorAll('.btn-item').forEach(btn=>{ const txt=btn.textContent||''; if(!startsWithEmoji(txt)){ const em=detectEmoji(txt); if(em){ btn.textContent=em+' '+txt; changed++; } } }); try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){} reEmojiBtn.title = changed? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)'; scheduleLayout(); saveChips(); }); }
+    if(reEmojiBtn){ reEmojiBtn.addEventListener('click', ()=>{ let changed=0; list.querySelectorAll('.btn-item').forEach(btn=>{ const txt=btn.textContent||''; if(!startsWithEmoji(txt)){ const em=detectEmoji(txt); if(em){ btn.textContent=em+' '+txt; changed++; } } }); try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){} reEmojiBtn.title = changed? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)'; scheduleLayout(true); saveChips(); }); }
 
     // ===== Smoke tests (manual) =====
     function runSmokeTests(){ try{ const before=list.children.length; if(emojiToggle) emojiToggle.checked=true; ['Bug','Kaffeemaschine','Lift','YouTube','TikTok','Webseite','Computer','Netzwerk','Drucker'].forEach(t=>{ input.value=t; addFromInput(); }); const after=list.children.length; console.assert(after>=before+9, 'Should add 9 chips'); const first=list.querySelector('.btn-item'); console.assert(first && /\p{Extended_Pictographic}/u.test(first.textContent.trim().charAt(0))===true, 'First chip should start with an emoji'); first.click(); console.assert(first.getAttribute('aria-pressed')==='true','Chip should be spotlighted'); document.getElementById('reEmoji').click(); console.assert(/^\p{Extended_Pictographic}\s/u.test(first.textContent)===true,'Re-emoji should keep single leading emoji'); }catch(e){ console.warn('Smoke tests issue (non-fatal):', e); } }
