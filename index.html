@@ -235,14 +235,14 @@
     layoutConfig.step = Math.max(2, Math.min(8, Math.round(layoutConfig.gutter / 2))) || layoutConfig.step;
     if(chipMarginInput) chipMarginInput.value = String(Math.round(layoutConfig.gutter));
 
-    function layoutChipsNow({ reorder = false } = {}){
+    function layoutChipsNow(){
       if(!list) return;
       const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement);
       if(!wraps.length){
         list.style.height = '0px';
         return;
       }
-      const { step, gutter } = layoutConfig;
+      const { gutter } = layoutConfig;
       const styles = (typeof window !== 'undefined' && window.getComputedStyle)
         ? window.getComputedStyle(list)
         : null;
@@ -250,55 +250,43 @@
       const padRight = styles ? parseFloat(styles.paddingRight) || 0 : 0;
       const padTop = styles ? parseFloat(styles.paddingTop) || 0 : 0;
       const padBottom = styles ? parseFloat(styles.paddingBottom) || 0 : 0;
-      const candidateStep = Math.max(1, step);
-      const availableWidth = Math.max(candidateStep, list.clientWidth - padLeft - padRight);
-      if(availableWidth <= 0){
+      const rawWidth = list.clientWidth - padLeft - padRight;
+      if(rawWidth <= 0){
         list.style.height = '0px';
         return;
       }
-      const targets = reorder ? [...wraps].sort((a, b) => b.offsetHeight - a.offsetHeight || b.offsetWidth - a.offsetWidth) : wraps;
-      let maxHeight = 0;
-      const placed = [];
-      targets.forEach(wrap => {
+      const availableWidth = Math.max(1, rawWidth);
+      let cursorX = 0;
+      let cursorY = 0;
+      let rowHeight = 0;
+      let maxBottom = 0;
+      // Lay chips row by row in DOM order so entries stay chronological.
+      wraps.forEach(wrap => {
         if(!(wrap instanceof HTMLElement)) return;
         const itemWidth = wrap.offsetWidth;
         const itemHeight = wrap.offsetHeight;
-        const maxLeft = Math.max(0, availableWidth - itemWidth);
-        let bestX = 0;
-        let bestY = Number.POSITIVE_INFINITY;
-        const stepCount = Math.max(1, Math.floor(maxLeft / candidateStep));
-        for(let idx=0; idx<=stepCount; idx++){
-          const x = idx === stepCount ? maxLeft : idx * candidateStep;
-          const left = x;
-          const right = left + itemWidth;
-          let y = 0;
-          placed.forEach(pos => {
-            const horizontalOverlap = !(right + gutter/2 <= pos.left - gutter/2 || left - gutter/2 >= pos.right + gutter/2);
-            if(horizontalOverlap){
-              y = Math.max(y, pos.bottom + gutter);
-            }
-          });
-          if(y < bestY - 0.1 || (Math.abs(y - bestY) < 0.1 && left < bestX)){
-            bestX = left;
-            bestY = y;
-          }
+        if(cursorX > 0 && cursorX + itemWidth > availableWidth){
+          cursorX = 0;
+          cursorY += rowHeight + gutter;
+          rowHeight = 0;
         }
-        const finalLeft = padLeft + bestX;
-        const finalTop = padTop + bestY;
+        const finalLeft = padLeft + cursorX;
+        const finalTop = padTop + cursorY;
         wrap.style.transform = `translate3d(${finalLeft}px, ${finalTop}px, 0)`;
-        const bottom = bestY + itemHeight;
-        placed.push({ left: bestX, right: bestX + itemWidth, bottom });
-        maxHeight = Math.max(maxHeight, bottom);
+        cursorX += itemWidth + gutter;
+        rowHeight = Math.max(rowHeight, itemHeight);
+        maxBottom = Math.max(maxBottom, cursorY + itemHeight);
       });
-      list.style.height = padTop + Math.max(0, maxHeight + padBottom) + 'px';
+      const totalHeight = padTop + Math.max(0, maxBottom + padBottom);
+      list.style.height = totalHeight + 'px';
     }
 
-    function scheduleLayout(reorder = false){
+    function scheduleLayout(){
       if(layoutScheduled) return;
       layoutScheduled = true;
       raf(() => {
         layoutScheduled = false;
-        layoutChipsNow({ reorder });
+        layoutChipsNow();
       });
     }
 
@@ -322,7 +310,7 @@
         updateBaseMetrics(btn);
         applyStageToChip(btn, stage);
       });
-      scheduleLayout(true);
+      scheduleLayout();
     }
 
     // ===== Font toolbar =====
@@ -373,7 +361,7 @@
       if(chipMarginInput){
         chipMarginInput.value = String(clamped);
       }
-      scheduleLayout(true);
+      scheduleLayout();
       return true;
     };
 
@@ -540,7 +528,7 @@
       const next = (current + 1) % SPOTLIGHT_STEPS.length;
       updateBaseMetrics(btn);
       applyStageToChip(btn, next);
-      scheduleLayout(true);
+      scheduleLayout();
       saveChips();
     }
 
@@ -573,7 +561,7 @@
           const host=btn.closest('.btn-wrap');
           if(host){
             host.remove();
-            scheduleLayout(true);
+            scheduleLayout();
             saveChips();
           }
         }
@@ -629,7 +617,7 @@
       refreshChipMetrics();
       saveChips();
       if(input) input.focus();
-      scheduleLayout(true);
+      scheduleLayout();
     }
 
     function loadChips(){
@@ -642,7 +630,7 @@
       if(!Array.isArray(parsed)) return;
       parsed.forEach(appendChipFromData);
       refreshChipMetrics();
-      scheduleLayout(true);
+      scheduleLayout();
     }
 
     function addFromInput(){
@@ -650,13 +638,20 @@
       if(!value) return;
       const node=createChip(value);
       list.appendChild(node);
-      scheduleLayout(true);
+      scheduleLayout();
       saveChips();
       input.value='';
       input.focus();
     }
+    function clearAllChips(){
+      if(!list) return;
+      list.innerHTML='';
+      scheduleLayout();
+      saveChips();
+      if(input) input.focus();
+    }
     loadChips();
-    scheduleLayout(true);
+    scheduleLayout();
     settingsReady = true;
     persistSettings();
 
@@ -711,7 +706,17 @@
 
     // Delete key removes focused chip
     document.addEventListener('keydown', (e)=>{
-      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active=document.activeElement; if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const host=active.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(true); saveChips(); } input.focus(); }
+      if((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && typeof e.key==='string' && e.key.toLowerCase()==='d'){
+        if(isTypingContext(e.target)) return;
+        e.preventDefault();
+        if(window.confirm('Delete all items?')){
+          clearAllChips();
+        }
+        return;
+      }
+    });
+    document.addEventListener('keydown', (e)=>{
+      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active=document.activeElement; if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const host=active.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(); saveChips(); } input.focus(); }
     });
 
     // Re-emoji existing chips
