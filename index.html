@@ -76,7 +76,6 @@
 
     /* Grow behavior for spotlight (no overlap) */
     .btn-item{transform-origin:center center}
-    .btn-item[aria-pressed="true"]{transform:none !important; z-index:10; font-size:calc(var(--fs, 1rem) * 2); padding:calc(var(--py, .5rem) * 2) calc(var(--px, 1rem) * 2)}
     .btn-wrap{
       position:absolute;
       display:block;
@@ -123,29 +122,24 @@
           <button id="addBtn" type="button" class="btn btn-primary">Add</button>
         </div>
         <div class="options-row">
-          <label class="label" title="Give new chips a random background color"><input id="randColor" type="checkbox" checked> Random color</label>
-          <label class="label" title="Automatically prepend an emoji based on the text"><input id="autoEmoji" type="checkbox"> Auto emoji</label>
-          <div class="control-group">
+          <div class="control-group" style="flex-wrap:wrap; gap:.75rem">
+            <label class="label" title="Give new chips a random background color"><input id="randColor" type="checkbox" checked> Color</label>
+            <label class="label" title="Automatically prepend an emoji based on the text"><input id="autoEmoji" type="checkbox"> Emoji</label>
             <button id="reEmoji" type="button" title="Re-scan all chips and prepend emojis where missing" class="btn">Re-emoji</button>
             <button id="decFont2" type="button" class="btn" title="Smaller chip font">F-</button>
             <button id="incFont2" type="button" class="btn" title="Larger chip font">F+</button>
-          </div>
-          <div class="control-group" style="gap:.75rem">
             <label class="label" style="gap:.35rem" title="Adjust pill base size"><span>Size</span>
               <input id="chipSize" type="range" min="0.6" max="6" step="0.005" value="1" />
             </label>
             <label class="label" style="gap:.35rem" title="Adjust spacing between pills"><span>Spacing</span>
               <input id="chipMargin" type="range" min="0" max="32" step="1" value="8" />
             </label>
-          </div>
-          <div class="control-group">
-            <button id="exportBtn" type="button" class="btn" title="Download chips as JSON">Export JSON</button>
-            <button id="importBtn" type="button" class="btn" title="Import chips from JSON">Import JSON</button>
+            <button id="exportBtn" type="button" class="btn" title="Download chips as a file">Export</button>
+            <button id="importBtn" type="button" class="btn" title="Import chips from a file">Import</button>
             <input id="importFile" type="file" accept="application/json" style="display:none">
           </div>
         </div>
       </div>
-      <p style="padding:0 1rem 1rem; margin:0; color:#6b7280; font-size:.9rem">Press <kbd>Enter</kbd> to add. Hotkeys: <kbd>Q</kbd> / <kbd>W</kbd> adjust chip font, <kbd>E</kbd> focuses the input. Click a chip to spotlight it (200% size). Options: <em>Random color</em>, <em>Auto emoji</em>, <em>Re-emoji</em>, local <em>F-/F+</em> font controls, <em>Size</em>/<em>Spacing</em> sliders, plus JSON <em>Export/Import</em>.</p>
     </section>
 
     <section style="margin-top:1.5rem">
@@ -170,6 +164,7 @@
     const SETTINGS_KEY = 'discussion.settings.v1';
     const EXPORT_FILENAME = 'discussion-chips.json';
     const layoutConfig = { step: 4, gutter: 8, chipScale: 1 };
+    const SPOTLIGHT_STEPS = [0, 0.3, 0.6, 0.9];
     const raf = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
       ? window.requestAnimationFrame.bind(window)
       : (cb) => setTimeout(cb, 16);
@@ -320,9 +315,12 @@
 
     function refreshChipMetrics(){
       if (!list) return;
-      list.querySelectorAll('.btn-item').forEach(btn => {
-        delete btn.dataset.metrics;
-        ensureMetrics(btn);
+      const buttons = Array.from(list.querySelectorAll('.btn-item'));
+      buttons.forEach(btn => { btn.dataset.metrics = '0'; });
+      buttons.forEach(btn => {
+        const stage = Number(btn.dataset.scaleStage || '0');
+        updateBaseMetrics(btn);
+        applyStageToChip(btn, stage);
       });
       scheduleLayout(true);
     }
@@ -330,7 +328,7 @@
     // ===== Font toolbar =====
     const fontPct = document.getElementById('fontPct');
     const chipScaleStep = 0.125;
-    const chipScaleMin = 0.75;
+    const chipScaleMin = sliderBounds.size.min;
     const chipScaleMax = 6;
     const sizeStep = sliderBounds.size.step || 0.005;
     let chipScale = clampNumber(uiSettings.chipScale, sliderBounds.size.min, sliderBounds.size.max);
@@ -486,15 +484,69 @@
     function maybeAddEmoji(label){ if(!emojiToggle||!emojiToggle.checked) return label; if(startsWithEmoji(label)) return label; const em=detectEmoji(label); return em? (em+' '+label):label; }
 
     // ===== Chip helpers =====
-    function ensureMetrics(btn){ if(btn.dataset.metrics==='1') return; const cs=getComputedStyle(btn); btn.style.setProperty('--fs', cs.fontSize); btn.style.setProperty('--px', cs.paddingLeft); btn.style.setProperty('--py', cs.paddingTop); btn.dataset.metrics='1'; }
+    function updateBaseMetrics(btn){
+      const stage = Number(btn.dataset.scaleStage || '0');
+      const factor = 1 + (SPOTLIGHT_STEPS[stage] || 0);
+      const cs = getComputedStyle(btn);
+      const normalize = (value) => {
+        const num = parseFloat(value);
+        if(!Number.isFinite(num)) return 0;
+        return num / (factor || 1);
+      };
+      btn.dataset.baseFont = String(normalize(cs.fontSize));
+      btn.dataset.basePadLeft = String(normalize(cs.paddingLeft));
+      btn.dataset.basePadRight = String(normalize(cs.paddingRight));
+      btn.dataset.basePadTop = String(normalize(cs.paddingTop));
+      btn.dataset.basePadBottom = String(normalize(cs.paddingBottom));
+      btn.dataset.metrics='1';
+    }
+
+    function applyStageToChip(btn, stage, { remeasure = false } = {}){
+      let next = Number(stage);
+      if(!Number.isFinite(next) || next < 0 || next >= SPOTLIGHT_STEPS.length) next = 0;
+      if(remeasure || btn.dataset.metrics!=='1') updateBaseMetrics(btn);
+      btn.dataset.scaleStage = String(next);
+      const factor = 1 + SPOTLIGHT_STEPS[next];
+      const baseFont = Number(btn.dataset.baseFont);
+      const basePadLeft = Number(btn.dataset.basePadLeft);
+      const basePadRight = Number(btn.dataset.basePadRight);
+      const basePadTop = Number(btn.dataset.basePadTop);
+      const basePadBottom = Number(btn.dataset.basePadBottom);
+      const style = btn.style;
+      if(Math.abs(factor - 1) < 0.0001){
+        style.fontSize = '';
+        style.paddingLeft = '';
+        style.paddingRight = '';
+        style.paddingTop = '';
+        style.paddingBottom = '';
+        return;
+      }
+      const format = (base) => Number.isFinite(base) ? (base * factor).toFixed(3).replace(/\.?0+$/,'') + 'px' : '';
+      style.fontSize = format(baseFont);
+      style.paddingLeft = format(basePadLeft);
+      style.paddingRight = format(basePadRight);
+      style.paddingTop = format(basePadTop);
+      style.paddingBottom = format(basePadBottom);
+    }
+
+    function cycleChipStage(btn){
+      const current = Number(btn.dataset.scaleStage || '0');
+      const next = (current + 1) % SPOTLIGHT_STEPS.length;
+      updateBaseMetrics(btn);
+      applyStageToChip(btn, next);
+      scheduleLayout(true);
+      saveChips();
+    }
 
     function createChip(label, options = {}){
       const wrap=document.createElement('div'); wrap.className='btn-wrap'; wrap.style.transform='translate3d(0,0,0)';
       const btn=document.createElement('button'); btn.type='button'; btn.className='btn-item chip';
       btn.dataset.label = label;
+      btn.dataset.scaleStage = '0';
+      btn.dataset.metrics = '0';
       btn.textContent = maybeAddEmoji(label);
       if(typeof options.displayText === 'string') btn.textContent = options.displayText;
-      btn.setAttribute('aria-pressed','false'); btn.title='Click to spotlight (toggle). Press Delete to remove';
+      btn.title='Click to cycle size (+30%, +60%, +90%, reset). Press Delete to remove';
       if(options.color){
         setChipColor(btn, options.color);
       }else if(!options.skipRandom && randToggle && randToggle.checked){
@@ -502,9 +554,26 @@
       }else{
         clearChipColor(btn);
       }
-      btn.addEventListener('click',()=>{ ensureMetrics(btn); const expanded=btn.getAttribute('aria-pressed')==='true'; btn.setAttribute('aria-pressed', String(!expanded)); btn.focus(); scheduleLayout(true); saveChips(); });
-      btn.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); btn.click(); } else if(e.key==='Delete'){ e.preventDefault(); const host=btn.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(true); saveChips(); } } });
-      wrap.appendChild(btn); return wrap;
+      btn.addEventListener('click',()=>{
+        cycleChipStage(btn);
+        btn.focus();
+      });
+      btn.addEventListener('keydown',(e)=>{
+        if(e.key==='Enter'||e.key===' '){
+          e.preventDefault();
+          cycleChipStage(btn);
+        } else if(e.key==='Delete'){
+          e.preventDefault();
+          const host=btn.closest('.btn-wrap');
+          if(host){
+            host.remove();
+            scheduleLayout(true);
+            saveChips();
+          }
+        }
+      });
+      wrap.appendChild(btn);
+      return wrap;
     }
 
     function getChipData(){
@@ -516,7 +585,7 @@
         payload.push({
           label: raw,
           color: btn.dataset.color || null,
-          pressed: btn.getAttribute('aria-pressed')==='true',
+          scaleStage: Number(btn.dataset.scaleStage || '0'),
           display: btn.textContent || ''
         });
       });
@@ -541,9 +610,9 @@
       const node=createChip(text, { color: item.color || undefined, skipRandom: true, displayText: display });
       list.appendChild(node);
       const btn=node.querySelector('.btn-item');
-      if(btn && item.pressed){
-        ensureMetrics(btn);
-        btn.setAttribute('aria-pressed','true');
+      if(btn){
+        const stage = Number(item.scaleStage || 0);
+        applyStageToChip(btn, stage, { remeasure: true });
       }
     }
 
@@ -634,18 +703,17 @@
     addBtn.addEventListener('click', addFromInput);
     input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); addFromInput(); } });
 
-    // Delete key removes focused/selected chip
+    // Delete key removes focused chip
     document.addEventListener('keydown', (e)=>{
-      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active=document.activeElement; if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const host=active.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(true); saveChips(); } input.focus(); return; }
-      const selected=list.querySelector('.btn-item[aria-pressed="true"]'); if(selected){ e.preventDefault(); const host=selected.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(true); saveChips(); } input.focus(); }
+      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active=document.activeElement; if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const host=active.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(true); saveChips(); } input.focus(); }
     });
 
     // Re-emoji existing chips
     const reEmojiBtn=document.getElementById('reEmoji');
-    if(reEmojiBtn){ reEmojiBtn.addEventListener('click', ()=>{ let changed=0; list.querySelectorAll('.btn-item').forEach(btn=>{ const txt=btn.textContent||''; if(!startsWithEmoji(txt)){ const em=detectEmoji(txt); if(em){ btn.textContent=em+' '+txt; changed++; } } }); try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){} reEmojiBtn.title = changed? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)'; scheduleLayout(true); saveChips(); }); }
+    if(reEmojiBtn){ reEmojiBtn.addEventListener('click', ()=>{ let changed=0; list.querySelectorAll('.btn-item').forEach(btn=>{ const txt=btn.textContent||''; if(!startsWithEmoji(txt)){ const em=detectEmoji(txt); if(em){ btn.textContent=em+' '+txt; changed++; } } }); try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){} reEmojiBtn.title = changed? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)'; refreshChipMetrics(); saveChips(); }); }
 
     // ===== Smoke tests (manual) =====
-    function runSmokeTests(){ try{ const before=list.children.length; if(emojiToggle) emojiToggle.checked=true; ['Bug','Kaffeemaschine','Lift','YouTube','TikTok','Webseite','Computer','Netzwerk','Drucker'].forEach(t=>{ input.value=t; addFromInput(); }); const after=list.children.length; console.assert(after>=before+9, 'Should add 9 chips'); const first=list.querySelector('.btn-item'); console.assert(first && /\p{Extended_Pictographic}/u.test(first.textContent.trim().charAt(0))===true, 'First chip should start with an emoji'); first.click(); console.assert(first.getAttribute('aria-pressed')==='true','Chip should be spotlighted'); document.getElementById('reEmoji').click(); console.assert(/^\p{Extended_Pictographic}\s/u.test(first.textContent)===true,'Re-emoji should keep single leading emoji'); }catch(e){ console.warn('Smoke tests issue (non-fatal):', e); } }
+    function runSmokeTests(){ try{ const before=list.children.length; if(emojiToggle) emojiToggle.checked=true; ['Bug','Kaffeemaschine','Lift','YouTube','TikTok','Webseite','Computer','Netzwerk','Drucker'].forEach(t=>{ input.value=t; addFromInput(); }); const after=list.children.length; console.assert(after>=before+9, 'Should add 9 chips'); const first=list.querySelector('.btn-item'); console.assert(first && /\p{Extended_Pictographic}/u.test(first.textContent.trim().charAt(0))===true, 'First chip should start with an emoji'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===1,'First cycle should set stage 1'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===2,'Second cycle should set stage 2'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===3,'Third cycle should set stage 3'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===0,'Fourth cycle should reset stage'); document.getElementById('reEmoji').click(); console.assert(/^\p{Extended_Pictographic}\s/u.test(first.textContent)===true,'Re-emoji should keep single leading emoji'); }catch(e){ console.warn('Smoke tests issue (non-fatal):', e); } }
     try{ if(new URLSearchParams(location.search).get('tests')==='1') runSmokeTests(); }catch(_){ }
   </script>
 </body>
