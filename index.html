@@ -62,9 +62,14 @@
     kbd{border:1px solid #d1d5db; border-radius:6px; padding:0 .25rem; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:.85em}
 
     /* Chip list */
-    #list{display:flex; flex-wrap:wrap; gap:.75rem}
+    #list{
+      position:relative;
+      width:100%;
+      min-height:0;
+      padding:6px;
+    }
 
-    .chip{border:1px solid #e5e7eb; background:#fff; color:#1f2937; border-radius:18px; padding:.5rem 1rem; font-size:calc(.95rem * var(--chip-font-scale, 1)); font-weight:500; box-shadow:0 1px 2px rgba(0,0,0,.05); transition: padding .22s ease, font-size .22s ease, box-shadow .22s ease, background-color .22s ease, border-color .22s ease, transform .12s ease}
+    .chip{border:1px solid #e5e7eb; background:#fff; color:#1f2937; border-radius:18px; padding:calc(.5rem * var(--chip-font-scale, 1)) calc(1rem * var(--chip-font-scale, 1)); font-size:calc(.95rem * var(--chip-font-scale, 1)); font-weight:500; box-shadow:0 1px 2px rgba(0,0,0,.05); transition: padding .22s ease, font-size .22s ease, box-shadow .22s ease, background-color .22s ease, border-color .22s ease, transform .12s ease}
     .chip:hover{box-shadow:0 6px 16px rgba(0,0,0,.08); transform:translateY(-1px); border-color:#67e8f9; background:#ecfeff}
     .chip:focus{outline:none; box-shadow:var(--ring)}
     .chip-colored:hover{filter:brightness(1.08)}
@@ -72,7 +77,16 @@
     /* Grow behavior for spotlight (no overlap) */
     .btn-item{transform-origin:center center}
     .btn-item[aria-pressed="true"]{transform:none !important; z-index:10; font-size:calc(var(--fs, 1rem) * 2); padding:calc(var(--py, .5rem) * 2) calc(var(--px, 1rem) * 2)}
-    .btn-wrap{position:relative}
+    .btn-wrap{
+      position:absolute;
+      display:block;
+      margin:0;
+      top:0;
+      left:0;
+      transform-origin:top left;
+      transition:transform .22s ease;
+      will-change:transform;
+    }
 
     /* Tooltip */
     .hint{position:relative}
@@ -144,6 +158,11 @@
 
     const STORAGE_KEY = 'discussion.chips.v1';
     const EXPORT_FILENAME = 'discussion-chips.json';
+    const layoutConfig = { step: 4, gutter: 8 };
+    const raf = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
+      ? window.requestAnimationFrame.bind(window)
+      : (cb) => setTimeout(cb, 16);
+    let layoutScheduled = false;
     const storage = (() => {
       try { return typeof localStorage !== 'undefined' ? localStorage : null; }
       catch (_) { return null; }
@@ -166,6 +185,76 @@
       catch (err) { console.warn('Local storage remove failed:', err); }
     };
 
+    function layoutChipsNow(){
+      if(!list) return;
+      const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement);
+      if(!wraps.length){
+        list.style.height = '0px';
+        return;
+      }
+      const { step, gutter } = layoutConfig;
+      const styles = (typeof window !== 'undefined' && window.getComputedStyle)
+        ? window.getComputedStyle(list)
+        : null;
+      const padLeft = styles ? parseFloat(styles.paddingLeft) || 0 : 0;
+      const padRight = styles ? parseFloat(styles.paddingRight) || 0 : 0;
+      const padTop = styles ? parseFloat(styles.paddingTop) || 0 : 0;
+      const padBottom = styles ? parseFloat(styles.paddingBottom) || 0 : 0;
+      const candidateStep = Math.max(1, step);
+      const availableWidth = Math.max(candidateStep, list.clientWidth - padLeft - padRight);
+      if(availableWidth <= 0){
+        list.style.height = '0px';
+        return;
+      }
+      const placed = [];
+      let maxHeight = 0;
+      wraps.forEach(wrap => {
+        if(!(wrap instanceof HTMLElement)) return;
+        const itemWidth = wrap.offsetWidth;
+        const itemHeight = wrap.offsetHeight;
+        const maxLeft = Math.max(0, availableWidth - itemWidth);
+        let bestX = 0;
+        let bestY = Number.POSITIVE_INFINITY;
+        const stepCount = Math.max(1, Math.floor(maxLeft / candidateStep));
+        for(let idx=0; idx<=stepCount; idx++){
+          const x = idx === stepCount ? maxLeft : idx * candidateStep;
+          const left = x;
+          const right = left + itemWidth;
+          let y = 0;
+          placed.forEach(pos => {
+            const horizontalOverlap = !(right + gutter/2 <= pos.left - gutter/2 || left - gutter/2 >= pos.right + gutter/2);
+            if(horizontalOverlap){
+              y = Math.max(y, pos.bottom + gutter);
+            }
+          });
+          if(y < bestY - 0.1 || (Math.abs(y - bestY) < 0.1 && left < bestX)){
+            bestX = left;
+            bestY = y;
+          }
+        }
+        const finalLeft = padLeft + bestX;
+        const finalTop = padTop + bestY;
+        wrap.style.transform = `translate3d(${finalLeft}px, ${finalTop}px, 0)`;
+        const bottom = bestY + itemHeight;
+        placed.push({ left: bestX, right: bestX + itemWidth, bottom });
+        maxHeight = Math.max(maxHeight, bottom);
+      });
+      list.style.height = padTop + Math.max(0, maxHeight + padBottom) + 'px';
+    }
+
+    function scheduleLayout(){
+      if(layoutScheduled) return;
+      layoutScheduled = true;
+      raf(() => {
+        layoutScheduled = false;
+        layoutChipsNow();
+      });
+    }
+
+    if(list){
+      window.addEventListener('resize', scheduleLayout);
+    }
+
     const isTypingContext = (el) => {
       if (!el) return false;
       if (el.isContentEditable) return true;
@@ -179,6 +268,7 @@
         delete btn.dataset.metrics;
         ensureMetrics(btn);
       });
+      scheduleLayout();
     }
 
     // ===== Font toolbar =====
@@ -195,7 +285,8 @@
     };
 
     const adjustChipScale = (delta) => {
-      const next = Math.min(chipScaleMax, Math.max(chipScaleMin, chipScale + delta));
+      const nextRaw = Number((chipScale + delta).toFixed(4));
+      const next = Math.min(chipScaleMax, Math.max(chipScaleMin, nextRaw));
       if (next === chipScale) return;
       chipScale = next;
       applyChipScale();
@@ -299,7 +390,7 @@
     function ensureMetrics(btn){ if(btn.dataset.metrics==='1') return; const cs=getComputedStyle(btn); btn.style.setProperty('--fs', cs.fontSize); btn.style.setProperty('--px', cs.paddingLeft); btn.style.setProperty('--py', cs.paddingTop); btn.dataset.metrics='1'; }
 
     function createChip(label, options = {}){
-      const wrap=document.createElement('div'); wrap.className='btn-wrap';
+      const wrap=document.createElement('div'); wrap.className='btn-wrap'; wrap.style.transform='translate3d(0,0,0)';
       const btn=document.createElement('button'); btn.type='button'; btn.className='btn-item chip';
       btn.dataset.label = label;
       btn.textContent = maybeAddEmoji(label);
@@ -312,8 +403,8 @@
       }else{
         clearChipColor(btn);
       }
-      btn.addEventListener('click',()=>{ ensureMetrics(btn); const expanded=btn.getAttribute('aria-pressed')==='true'; btn.setAttribute('aria-pressed', String(!expanded)); btn.focus(); saveChips(); });
-      btn.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); btn.click(); } else if(e.key==='Delete'){ e.preventDefault(); const host=btn.closest('.btn-wrap'); if(host){ host.remove(); saveChips(); } } });
+      btn.addEventListener('click',()=>{ ensureMetrics(btn); const expanded=btn.getAttribute('aria-pressed')==='true'; btn.setAttribute('aria-pressed', String(!expanded)); btn.focus(); scheduleLayout(); saveChips(); });
+      btn.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); btn.click(); } else if(e.key==='Delete'){ e.preventDefault(); const host=btn.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(); saveChips(); } } });
       wrap.appendChild(btn); return wrap;
     }
 
@@ -364,6 +455,7 @@
       refreshChipMetrics();
       saveChips();
       if(input) input.focus();
+      scheduleLayout();
     }
 
     function loadChips(){
@@ -376,6 +468,7 @@
       if(!Array.isArray(parsed)) return;
       parsed.forEach(appendChipFromData);
       refreshChipMetrics();
+      scheduleLayout();
     }
 
     function addFromInput(){
@@ -383,11 +476,13 @@
       if(!value) return;
       const node=createChip(value);
       list.appendChild(node);
+      scheduleLayout();
       saveChips();
       input.value='';
       input.focus();
     }
     loadChips();
+    scheduleLayout();
 
     if(exportBtn){
       exportBtn.addEventListener('click', ()=>{
@@ -440,13 +535,13 @@
 
     // Delete key removes focused/selected chip
     document.addEventListener('keydown', (e)=>{
-      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active=document.activeElement; if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const host=active.closest('.btn-wrap'); if(host){ host.remove(); saveChips(); } input.focus(); return; }
-      const selected=list.querySelector('.btn-item[aria-pressed="true"]'); if(selected){ e.preventDefault(); const host=selected.closest('.btn-wrap'); if(host){ host.remove(); saveChips(); } input.focus(); }
+      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active=document.activeElement; if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const host=active.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(); saveChips(); } input.focus(); return; }
+      const selected=list.querySelector('.btn-item[aria-pressed="true"]'); if(selected){ e.preventDefault(); const host=selected.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(); saveChips(); } input.focus(); }
     });
 
     // Re-emoji existing chips
     const reEmojiBtn=document.getElementById('reEmoji');
-    if(reEmojiBtn){ reEmojiBtn.addEventListener('click', ()=>{ let changed=0; list.querySelectorAll('.btn-item').forEach(btn=>{ const txt=btn.textContent||''; if(!startsWithEmoji(txt)){ const em=detectEmoji(txt); if(em){ btn.textContent=em+' '+txt; changed++; } } }); try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){} reEmojiBtn.title = changed? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)'; saveChips(); }); }
+    if(reEmojiBtn){ reEmojiBtn.addEventListener('click', ()=>{ let changed=0; list.querySelectorAll('.btn-item').forEach(btn=>{ const txt=btn.textContent||''; if(!startsWithEmoji(txt)){ const em=detectEmoji(txt); if(em){ btn.textContent=em+' '+txt; changed++; } } }); try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){} reEmojiBtn.title = changed? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)'; scheduleLayout(); saveChips(); }); }
 
     // ===== Smoke tests (manual) =====
     function runSmokeTests(){ try{ const before=list.children.length; if(emojiToggle) emojiToggle.checked=true; ['Bug','Kaffeemaschine','Lift','YouTube','TikTok','Webseite','Computer','Netzwerk','Drucker'].forEach(t=>{ input.value=t; addFromInput(); }); const after=list.children.length; console.assert(after>=before+9, 'Should add 9 chips'); const first=list.querySelector('.btn-item'); console.assert(first && /\p{Extended_Pictographic}/u.test(first.textContent.trim().charAt(0))===true, 'First chip should start with an emoji'); first.click(); console.assert(first.getAttribute('aria-pressed')==='true','Chip should be spotlighted'); document.getElementById('reEmoji').click(); console.assert(/^\p{Extended_Pictographic}\s/u.test(first.textContent)===true,'Re-emoji should keep single leading emoji'); }catch(e){ console.warn('Smoke tests issue (non-fatal):', e); } }
