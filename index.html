@@ -116,9 +116,14 @@
             <button id="decFont2" type="button" class="btn" title="Smaller chip font">F-</button>
             <button id="incFont2" type="button" class="btn" title="Larger chip font">F+</button>
           </div>
+          <div class="control-group">
+            <button id="exportBtn" type="button" class="btn" title="Download chips as JSON">Export JSON</button>
+            <button id="importBtn" type="button" class="btn" title="Import chips from JSON">Import JSON</button>
+            <input id="importFile" type="file" accept="application/json" style="display:none">
+          </div>
         </div>
       </div>
-      <p style="padding:0 1rem 1rem; margin:0; color:#6b7280; font-size:.9rem">Press <kbd>Enter</kbd> to add. Hotkeys: <kbd>Q</kbd> / <kbd>W</kbd> adjust chip font, <kbd>E</kbd> focuses the input. Click a chip to spotlight it (200% size). Options: <em>Random color</em>, <em>Auto emoji</em>, <em>Re-emoji</em>, and local <em>F-/F+</em> font controls.</p>
+      <p style="padding:0 1rem 1rem; margin:0; color:#6b7280; font-size:.9rem">Press <kbd>Enter</kbd> to add. Hotkeys: <kbd>Q</kbd> / <kbd>W</kbd> adjust chip font, <kbd>E</kbd> focuses the input. Click a chip to spotlight it (200% size). Options: <em>Random color</em>, <em>Auto emoji</em>, <em>Re-emoji</em>, local <em>F-/F+</em> font controls, plus JSON <em>Export/Import</em>.</p>
     </section>
 
     <section style="margin-top:1.5rem">
@@ -133,8 +138,12 @@
     const addBtn = document.getElementById('addBtn');
     const randToggle = document.getElementById('randColor');
     const emojiToggle = document.getElementById('autoEmoji');
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const importFileInput = document.getElementById('importFile');
 
     const STORAGE_KEY = 'discussion.chips.v1';
+    const EXPORT_FILENAME = 'discussion-chips.json';
     const storage = (() => {
       try { return typeof localStorage !== 'undefined' ? localStorage : null; }
       catch (_) { return null; }
@@ -308,8 +317,8 @@
       wrap.appendChild(btn); return wrap;
     }
 
-    function saveChips(){
-      if(!list) return;
+    function getChipData(){
+      if(!list) return [];
       const payload = [];
       list.querySelectorAll('.btn-item').forEach(btn=>{
         const raw = (btn.dataset.label || '').trim();
@@ -321,11 +330,40 @@
           display: btn.textContent || ''
         });
       });
+      return payload;
+    }
+
+    function saveChips(){
+      if(!list) return;
+      const payload = getChipData();
       if(payload.length){
         writeStorage(STORAGE_KEY, JSON.stringify(payload));
       }else{
         removeStorage(STORAGE_KEY);
       }
+    }
+
+    function appendChipFromData(item){
+      if(!list || !item || typeof item.label!=='string') return;
+      const text = item.label.trim();
+      if(!text) return;
+      const display = typeof item.display==='string' ? item.display : undefined;
+      const node=createChip(text, { color: item.color || undefined, skipRandom: true, displayText: display });
+      list.appendChild(node);
+      const btn=node.querySelector('.btn-item');
+      if(btn && item.pressed){
+        ensureMetrics(btn);
+        btn.setAttribute('aria-pressed','true');
+      }
+    }
+
+    function replaceChips(data){
+      if(!list) return;
+      list.innerHTML='';
+      if(Array.isArray(data)) data.forEach(appendChipFromData);
+      refreshChipMetrics();
+      saveChips();
+      if(input) input.focus();
     }
 
     function loadChips(){
@@ -336,19 +374,8 @@
       try{ parsed = JSON.parse(raw); }
       catch(err){ console.warn('Local storage parse failed:', err); return; }
       if(!Array.isArray(parsed)) return;
-      parsed.forEach(item=>{
-        if(!item || typeof item.label!=='string') return;
-        const text = item.label.trim();
-        if(!text) return;
-        const display = typeof item.display==='string' ? item.display : undefined;
-        const node=createChip(text, { color: item.color || undefined, skipRandom: true, displayText: display });
-        list.appendChild(node);
-        const btn=node.querySelector('.btn-item');
-        if(btn && item.pressed){
-          ensureMetrics(btn);
-          btn.setAttribute('aria-pressed','true');
-        }
-      });
+      parsed.forEach(appendChipFromData);
+      refreshChipMetrics();
     }
 
     function addFromInput(){
@@ -361,6 +388,53 @@
       input.focus();
     }
     loadChips();
+
+    if(exportBtn){
+      exportBtn.addEventListener('click', ()=>{
+        const payload = getChipData();
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = EXPORT_FILENAME;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(()=>URL.revokeObjectURL(url), 0);
+      });
+    }
+
+    if(importBtn && importFileInput){
+      importBtn.addEventListener('click', ()=>{
+        importFileInput.value = '';
+        importFileInput.click();
+      });
+      importFileInput.addEventListener('change', ()=>{
+        const file = importFileInput.files && importFileInput.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try{
+            const text = reader.result;
+            const parsed = JSON.parse(typeof text === 'string' ? text : '');
+            if(!Array.isArray(parsed)) throw new Error('Invalid JSON');
+            replaceChips(parsed);
+          }catch(err){
+            console.warn('Import failed:', err);
+            alert('Import failed. Please choose a valid export JSON file.');
+          }finally{
+            importFileInput.value = '';
+          }
+        };
+        reader.onerror = () => {
+          console.warn('Import file read error:', reader.error);
+          alert('Could not read the selected file.');
+          importFileInput.value = '';
+        };
+        reader.readAsText(file);
+      });
+    }
+
     addBtn.addEventListener('click', addFromInput);
     input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); addFromInput(); } });
 
