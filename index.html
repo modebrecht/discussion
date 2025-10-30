@@ -134,6 +134,7 @@
             <label class="label" style="gap:.35rem" title="Adjust spacing between pills"><span>Spacing</span>
               <input id="chipMargin" type="range" min="0" max="32" step="1" value="8" />
             </label>
+            <button id="masonryToggle" type="button" class="btn" title="Toggle dense masonry packing for chips">Masonry</button>
             <button id="exportBtn" type="button" class="btn" title="Download chips as a file">Export</button>
             <button id="importBtn" type="button" class="btn" title="Import chips from a file">Import</button>
             <input id="importFile" type="file" accept="application/json" style="display:none">
@@ -157,13 +158,14 @@
     const exportBtn = document.getElementById('exportBtn');
     const importBtn = document.getElementById('importBtn');
     const importFileInput = document.getElementById('importFile');
+    const masonryToggleBtn = document.getElementById('masonryToggle');
     const chipSizeInput = document.getElementById('chipSize');
     const chipMarginInput = document.getElementById('chipMargin');
 
     const STORAGE_KEY = 'discussion.chips.v1';
     const SETTINGS_KEY = 'discussion.settings.v1';
     const EXPORT_FILENAME = 'discussion-chips.json';
-    const layoutConfig = { step: 4, gutter: 8, chipScale: 1 };
+    const layoutConfig = { step: 4, gutter: 8, chipScale: 1, mode: 'flow' };
     const SPOTLIGHT_STEPS = [0, 0.3, 0.6, 0.9];
     const raf = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
       ? window.requestAnimationFrame.bind(window)
@@ -171,6 +173,7 @@
     const chipResizeObserver = (typeof ResizeObserver !== 'undefined')
       ? new ResizeObserver(() => scheduleLayout())
       : null;
+    let chipSequence = 0;
     let layoutScheduled = false;
     const storage = (() => {
       try { return typeof localStorage !== 'undefined' ? localStorage : null; }
@@ -259,12 +262,46 @@
         return;
       }
       const availableWidth = Math.max(1, rawWidth);
+
+      const orderedWraps = layoutConfig.mode === 'masonry'
+        ? buildMasonryOrder(wraps, { availableWidth, gutter })
+        : wraps;
+
+      if(layoutConfig.mode === 'masonry'){
+        let cursorY = 0;
+        let rowHeight = 0;
+        let maxBottom = 0;
+        let cursorX = 0;
+        orderedWraps.forEach((wrap, index) => {
+          if(!(wrap instanceof HTMLElement)) return;
+          const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
+          const itemWidth = chip ? chip.offsetWidth : wrap.offsetWidth;
+          const itemHeight = chip ? chip.offsetHeight : wrap.offsetHeight;
+          const isFirstInRow = cursorX === 0;
+          const neededWidth = itemWidth + (isFirstInRow ? 0 : gutter);
+          if(!isFirstInRow && cursorX + neededWidth > availableWidth + 0.5){
+            cursorX = 0;
+            cursorY += rowHeight + gutter;
+            rowHeight = 0;
+          }
+          const finalLeft = padLeft + cursorX + (isFirstInRow ? 0 : gutter);
+          const finalTop = padTop + cursorY;
+          wrap.style.transform = `translate3d(${finalLeft}px, ${finalTop}px, 0)`;
+          cursorX += neededWidth;
+          rowHeight = Math.max(rowHeight, itemHeight);
+          maxBottom = Math.max(maxBottom, cursorY + itemHeight);
+        });
+        const totalHeight = padTop + Math.max(0, maxBottom + padBottom);
+        list.style.height = totalHeight + 'px';
+        return;
+      }
+
       let cursorX = 0;
       let cursorY = 0;
       let rowHeight = 0;
       let maxBottom = 0;
       // Lay chips row by row in DOM order so entries stay chronological.
-      wraps.forEach(wrap => {
+      orderedWraps.forEach(wrap => {
         if(!(wrap instanceof HTMLElement)) return;
         const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
         // Measure the interactive button itself so spacing stays accurate while wraps animate.
@@ -580,7 +617,17 @@
     }
 
     function createChip(label, options = {}){
-      const wrap=document.createElement('div'); wrap.className='btn-wrap'; wrap.style.transform='translate3d(0,0,0)';
+      const wrap=document.createElement('div');
+      wrap.className='btn-wrap';
+      wrap.style.transform='translate3d(0,0,0)';
+      const providedOrder = options.createdAt;
+      const numericOrder = Number(providedOrder);
+      if(Number.isFinite(numericOrder)){
+        wrap.dataset.createdAt = String(numericOrder);
+        chipSequence = Math.max(chipSequence, numericOrder + 1);
+      }else{
+        wrap.dataset.createdAt = String(chipSequence++);
+      }
       const btn=document.createElement('button'); btn.type='button'; btn.className='btn-item chip';
       btn.dataset.label = label;
       btn.dataset.scaleStage = '0';
@@ -619,17 +666,96 @@
       return wrap;
     }
 
+    function sortWrapsBy(compare){
+      if(!list) return [];
+      const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement);
+      wraps.sort(compare).forEach(node => list.appendChild(node));
+      return wraps;
+    }
+
+    function buildMasonryOrder(wraps, { availableWidth, gutter }){
+      const candidates = wraps.map(wrap => {
+        if(!(wrap instanceof HTMLElement)) return null;
+        const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
+        const width = chip ? chip.offsetWidth : wrap.offsetWidth;
+        const height = chip ? chip.offsetHeight : wrap.offsetHeight;
+        if(width <= 0 || height <= 0) return null;
+        return { wrap, width, height };
+      }).filter(Boolean);
+      if(!candidates.length) return wraps;
+
+      const remaining = [...candidates].sort((a, b) => b.width - a.width);
+      const ordered = [];
+
+      while(remaining.length){
+        let rowSpace = availableWidth;
+        const rowItems = [];
+        for(let i = 0; i < remaining.length; ){
+          const item = remaining[i];
+          const itemWidth = item.width;
+          const required = itemWidth + (rowItems.length ? gutter : 0);
+          if(required <= rowSpace + 0.5){
+            rowItems.push(item);
+            rowSpace -= required;
+            remaining.splice(i, 1);
+          }else{
+            i++;
+          }
+        }
+        if(!rowItems.length){
+          rowItems.push(remaining.shift());
+        }
+        ordered.push(...rowItems);
+      }
+      return ordered.map(entry => entry.wrap);
+    }
+
+    function restoreCreationOrder(){
+      sortWrapsBy((a, b) => {
+        const aOrder = Number(a.dataset.createdAt || '0');
+        const bOrder = Number(b.dataset.createdAt || '0');
+        if(!Number.isFinite(aOrder) && !Number.isFinite(bOrder)) return 0;
+        if(!Number.isFinite(aOrder)) return 1;
+        if(!Number.isFinite(bOrder)) return -1;
+        return aOrder - bOrder;
+      });
+    }
+
+    function updateLayoutModeUI(){
+      const isMasonry = layoutConfig.mode === 'masonry';
+      if(masonryToggleBtn){
+        masonryToggleBtn.classList.toggle('btn-primary', isMasonry);
+        masonryToggleBtn.setAttribute('aria-pressed', String(isMasonry));
+      }
+    }
+
+    function setLayoutMode(mode, { force = false, reorder = true } = {}){
+      const next = mode === 'masonry' ? 'masonry' : 'flow';
+      const changed = layoutConfig.mode !== next;
+      layoutConfig.mode = next;
+      if(reorder && next === 'flow'){
+        restoreCreationOrder();
+      }
+      updateLayoutModeUI();
+      if(changed || force){
+        scheduleLayout();
+      }
+    }
+
     function getChipData(){
       if(!list) return [];
       const payload = [];
       list.querySelectorAll('.btn-item').forEach(btn=>{
         const raw = (btn.dataset.label || '').trim();
         if(!raw) return;
+        const host = btn.closest('.btn-wrap');
+        const orderValue = host ? Number(host.dataset.createdAt || '') : NaN;
         payload.push({
           label: raw,
           color: btn.dataset.color || null,
           scaleStage: Number(btn.dataset.scaleStage || '0'),
-          display: btn.textContent || ''
+          display: btn.textContent || '',
+          order: Number.isFinite(orderValue) ? orderValue : null
         });
       });
       return payload;
@@ -650,7 +776,13 @@
       const text = item.label.trim();
       if(!text) return;
       const display = typeof item.display==='string' ? item.display : undefined;
-      const node=createChip(text, { color: item.color || undefined, skipRandom: true, displayText: display });
+      const orderNumeric = Number(item.order);
+      const node=createChip(text, {
+        color: item.color || undefined,
+        skipRandom: true,
+        displayText: display,
+        createdAt: Number.isFinite(orderNumeric) ? orderNumeric : undefined
+      });
       list.appendChild(node);
       const btn=node.querySelector('.btn-item');
       if(btn){
@@ -661,8 +793,11 @@
 
     function replaceChips(data){
       if(!list) return;
-      list.innerHTML='';
+      list.innerHTML = '';
+      chipSequence = 0;
       if(Array.isArray(data)) data.forEach(appendChipFromData);
+      restoreCreationOrder();
+      setLayoutMode('flow', { force: true, reorder: false });
       refreshChipMetrics();
       saveChips();
       if(input) input.focus();
@@ -678,6 +813,8 @@
       catch(err){ console.warn('Local storage parse failed:', err); return; }
       if(!Array.isArray(parsed)) return;
       parsed.forEach(appendChipFromData);
+      restoreCreationOrder();
+      setLayoutMode('flow', { force: true, reorder: false });
       refreshChipMetrics();
       scheduleLayout();
     }
@@ -695,6 +832,7 @@
     function clearAllChips(){
       if(!list) return;
       list.innerHTML='';
+      chipSequence = 0;
       scheduleLayout();
       saveChips();
       if(input) input.focus();
@@ -703,6 +841,17 @@
     scheduleLayout();
     settingsReady = true;
     persistSettings();
+    updateLayoutModeUI();
+
+    if(masonryToggleBtn){
+      masonryToggleBtn.addEventListener('click', ()=>{
+        const nextMode = layoutConfig.mode === 'masonry' ? 'flow' : 'masonry';
+        setLayoutMode(nextMode, { force: true });
+        if(nextMode === 'flow'){
+          saveChips();
+        }
+      });
+    }
 
     if(exportBtn){
       exportBtn.addEventListener('click', ()=>{
