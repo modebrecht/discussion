@@ -168,6 +168,9 @@
     const raf = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
       ? window.requestAnimationFrame.bind(window)
       : (cb) => setTimeout(cb, 16);
+    const chipResizeObserver = (typeof ResizeObserver !== 'undefined')
+      ? new ResizeObserver(() => scheduleLayout())
+      : null;
     let layoutScheduled = false;
     const storage = (() => {
       try { return typeof localStorage !== 'undefined' ? localStorage : null; }
@@ -263,8 +266,10 @@
       // Lay chips row by row in DOM order so entries stay chronological.
       wraps.forEach(wrap => {
         if(!(wrap instanceof HTMLElement)) return;
-        const itemWidth = wrap.offsetWidth;
-        const itemHeight = wrap.offsetHeight;
+        const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
+        // Measure the interactive button itself so spacing stays accurate while wraps animate.
+        const itemWidth = chip ? chip.offsetWidth : wrap.offsetWidth;
+        const itemHeight = chip ? chip.offsetHeight : wrap.offsetHeight;
         if(cursorX > 0 && cursorX + itemWidth > availableWidth){
           cursorX = 0;
           cursorY += rowHeight + gutter;
@@ -309,6 +314,7 @@
         const stage = Number(btn.dataset.scaleStage || '0');
         updateBaseMetrics(btn);
         applyStageToChip(btn, stage);
+        if(chipResizeObserver) chipResizeObserver.observe(btn);
       });
       scheduleLayout();
     }
@@ -540,6 +546,7 @@
       btn.dataset.metrics = '0';
       btn.textContent = maybeAddEmoji(label);
       if(typeof options.displayText === 'string') btn.textContent = options.displayText;
+      if(chipResizeObserver) chipResizeObserver.observe(btn);
       btn.title='Click to cycle size (+30%, +60%, +90%, reset). Press Delete to remove';
       if(options.color){
         setChipColor(btn, options.color);
@@ -560,6 +567,7 @@
           e.preventDefault();
           const host=btn.closest('.btn-wrap');
           if(host){
+            if(chipResizeObserver) chipResizeObserver.unobserve(btn);
             host.remove();
             scheduleLayout();
             saveChips();
@@ -716,7 +724,20 @@
       }
     });
     document.addEventListener('keydown', (e)=>{
-      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active=document.activeElement; if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const host=active.closest('.btn-wrap'); if(host){ host.remove(); scheduleLayout(); saveChips(); } input.focus(); }
+      if(e.key!=='Delete' || isTypingContext(e.target)) return;
+      const active = document.activeElement;
+      if(active && active.classList && active.classList.contains('btn-item')){
+        e.preventDefault();
+        const btn = active;
+        const host = btn.closest('.btn-wrap');
+        if(host){
+          if(chipResizeObserver) chipResizeObserver.unobserve(btn);
+          host.remove();
+          scheduleLayout();
+          saveChips();
+        }
+        input.focus();
+      }
     });
 
     // Re-emoji existing chips
