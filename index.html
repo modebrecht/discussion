@@ -241,6 +241,58 @@
     layoutConfig.step = Math.max(2, Math.min(8, Math.round(layoutConfig.gutter / 2))) || layoutConfig.step;
     if(chipMarginInput) chipMarginInput.value = String(Math.round(layoutConfig.gutter));
 
+    function layoutMasonry(wraps, {
+      padLeft,
+      padTop,
+      padBottom,
+      availableWidth,
+      gutter
+    }){
+      const unit = Math.max(1, Math.round(layoutConfig.step || 4));
+      const columns = Math.max(1, Math.floor((availableWidth + gutter) / unit));
+      const columnHeights = new Array(columns).fill(0);
+      let maxBottom = 0;
+
+      wraps.forEach(wrap => {
+        if(!(wrap instanceof HTMLElement)) return;
+        const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
+        const itemWidth = chip ? chip.offsetWidth : wrap.offsetWidth;
+        const itemHeight = chip ? chip.offsetHeight : wrap.offsetHeight;
+        if(itemWidth <= 0 || itemHeight <= 0) return;
+
+        const unitsNeeded = Math.min(columns, Math.max(1, Math.ceil((itemWidth + gutter) / unit)));
+        let bestIndex = 0;
+        let bestHeight = Number.POSITIVE_INFINITY;
+        const searchLimit = columns - unitsNeeded;
+
+        for(let i = 0; i <= searchLimit; i++){
+          let spanHeight = 0;
+          for(let j = i; j < i + unitsNeeded; j++){
+            spanHeight = Math.max(spanHeight, columnHeights[j]);
+            if(spanHeight >= bestHeight) break;
+          }
+          if(spanHeight < bestHeight){
+            bestHeight = spanHeight;
+            bestIndex = i;
+            if(bestHeight === 0) break;
+          }
+        }
+
+        const finalLeft = padLeft + bestIndex * unit;
+        const finalTop = padTop + bestHeight;
+        wrap.style.transform = `translate3d(${finalLeft}px, ${finalTop}px, 0)`;
+
+        const newHeight = bestHeight + itemHeight + gutter;
+        for(let j = bestIndex; j < bestIndex + unitsNeeded; j++){
+          columnHeights[j] = newHeight;
+        }
+        maxBottom = Math.max(maxBottom, bestHeight + itemHeight);
+      });
+
+      const totalHeight = padTop + Math.max(0, maxBottom + padBottom);
+      return totalHeight;
+    }
+
     function layoutChipsNow(){
       if(!list) return;
       const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement);
@@ -263,35 +315,14 @@
       }
       const availableWidth = Math.max(1, rawWidth);
 
-      const orderedWraps = layoutConfig.mode === 'masonry'
-        ? buildMasonryOrder(wraps, { availableWidth, gutter })
-        : wraps;
-
       if(layoutConfig.mode === 'masonry'){
-        let cursorY = 0;
-        let rowHeight = 0;
-        let maxBottom = 0;
-        let cursorX = 0;
-        orderedWraps.forEach((wrap, index) => {
-          if(!(wrap instanceof HTMLElement)) return;
-          const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
-          const itemWidth = chip ? chip.offsetWidth : wrap.offsetWidth;
-          const itemHeight = chip ? chip.offsetHeight : wrap.offsetHeight;
-          const isFirstInRow = cursorX === 0;
-          const neededWidth = itemWidth + (isFirstInRow ? 0 : gutter);
-          if(!isFirstInRow && cursorX + neededWidth > availableWidth + 0.5){
-            cursorX = 0;
-            cursorY += rowHeight + gutter;
-            rowHeight = 0;
-          }
-          const finalLeft = padLeft + cursorX + (isFirstInRow ? 0 : gutter);
-          const finalTop = padTop + cursorY;
-          wrap.style.transform = `translate3d(${finalLeft}px, ${finalTop}px, 0)`;
-          cursorX += neededWidth;
-          rowHeight = Math.max(rowHeight, itemHeight);
-          maxBottom = Math.max(maxBottom, cursorY + itemHeight);
+        const totalHeight = layoutMasonry(wraps, {
+          padLeft,
+          padTop,
+          padBottom,
+          availableWidth,
+          gutter
         });
-        const totalHeight = padTop + Math.max(0, maxBottom + padBottom);
         list.style.height = totalHeight + 'px';
         return;
       }
@@ -301,7 +332,7 @@
       let rowHeight = 0;
       let maxBottom = 0;
       // Lay chips row by row in DOM order so entries stay chronological.
-      orderedWraps.forEach(wrap => {
+      wraps.forEach(wrap => {
         if(!(wrap instanceof HTMLElement)) return;
         const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
         // Measure the interactive button itself so spacing stays accurate while wraps animate.
@@ -671,43 +702,6 @@
       const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement);
       wraps.sort(compare).forEach(node => list.appendChild(node));
       return wraps;
-    }
-
-    function buildMasonryOrder(wraps, { availableWidth, gutter }){
-      const candidates = wraps.map(wrap => {
-        if(!(wrap instanceof HTMLElement)) return null;
-        const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
-        const width = chip ? chip.offsetWidth : wrap.offsetWidth;
-        const height = chip ? chip.offsetHeight : wrap.offsetHeight;
-        if(width <= 0 || height <= 0) return null;
-        return { wrap, width, height };
-      }).filter(Boolean);
-      if(!candidates.length) return wraps;
-
-      const remaining = [...candidates].sort((a, b) => b.width - a.width);
-      const ordered = [];
-
-      while(remaining.length){
-        let rowSpace = availableWidth;
-        const rowItems = [];
-        for(let i = 0; i < remaining.length; ){
-          const item = remaining[i];
-          const itemWidth = item.width;
-          const required = itemWidth + (rowItems.length ? gutter : 0);
-          if(required <= rowSpace + 0.5){
-            rowItems.push(item);
-            rowSpace -= required;
-            remaining.splice(i, 1);
-          }else{
-            i++;
-          }
-        }
-        if(!rowItems.length){
-          rowItems.push(remaining.shift());
-        }
-        ordered.push(...rowItems);
-      }
-      return ordered.map(entry => entry.wrap);
     }
 
     function restoreCreationOrder(){
