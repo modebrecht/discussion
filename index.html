@@ -105,6 +105,8 @@
         <h1 class="title">Discussion Board</h1>
       </div>
       <div class="font-controls">
+        <button id="importBtn" type="button" class="btn" title="Import chips from a file">Import</button>
+        <button id="exportBtn" type="button" class="btn" title="Download chips as a file">Export</button>
         <button id="decFont" class="btn hint" data-hint="Smaller font (F-)" type="button">F-</button>
         <button id="incFont" class="btn hint" data-hint="Larger font (F+)" type="button">F+</button>
         <span class="font-pct">Font: <strong id="fontPct">100%</strong></span>
@@ -126,8 +128,6 @@
             <label class="label" title="Give new chips a random background color"><input id="randColor" type="checkbox" checked> Color</label>
             <label class="label" title="Automatically prepend an emoji based on the text"><input id="autoEmoji" type="checkbox"> Emoji</label>
             <button id="reEmoji" type="button" title="Re-scan all chips and prepend emojis where missing" class="btn">Re-emoji</button>
-            <button id="decFont2" type="button" class="btn" title="Smaller chip font">F-</button>
-            <button id="incFont2" type="button" class="btn" title="Larger chip font">F+</button>
             <label class="label" style="gap:.35rem" title="Adjust pill base size"><span>Size</span>
               <input id="chipSize" type="range" min="0.6" max="6" step="0.005" value="1" />
             </label>
@@ -135,8 +135,6 @@
               <input id="chipMargin" type="range" min="0" max="32" step="1" value="8" />
             </label>
             <button id="masonryToggle" type="button" class="btn" title="Toggle dense masonry packing for chips">Masonry</button>
-            <button id="exportBtn" type="button" class="btn" title="Download chips as a file">Export</button>
-            <button id="importBtn" type="button" class="btn" title="Import chips from a file">Import</button>
             <input id="importFile" type="file" accept="application/json" style="display:none">
           </div>
         </div>
