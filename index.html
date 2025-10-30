@@ -76,7 +76,12 @@
     .chip-colored:hover{filter:brightness(1.08)}
     .chip-spotlight{border-color:var(--spotlight-border); box-shadow:0 20px 52px var(--spotlight-shadow-main), 0 0 0 3px var(--spotlight-shadow-ring), 0 0 18px var(--spotlight-shadow-glow); background-image:linear-gradient(135deg, var(--spotlight-grad-start), var(--spotlight-grad-end)); z-index:2}
     .chip-spotlight::before{content:''; position:absolute; inset:-18px; border-radius:inherit; background:radial-gradient(circle, var(--spotlight-halo), transparent 55%); opacity:.9; filter:blur(12px); z-index:-1; pointer-events:none}
-    .chip-spotlight::after{content:''; position:absolute; inset:-6px; border-radius:inherit; border:3px solid var(--spotlight-pulse-border); opacity:0; animation:chipSpotlightPulse 1.4s ease-in-out infinite; pointer-events:none; will-change:transform,opacity}
+    .chip-spotlight::after{content:''; position:absolute; inset:-7px; border-radius:inherit; border:4px solid var(--spotlight-pulse-border); opacity:0; animation:chipSpotlightPulse 1.4s ease-in-out infinite; pointer-events:none; will-change:transform,opacity}
+    .chip[draggable="true"]{cursor:grab; touch-action:none}
+    .chip[draggable="true"]:active,.chip-dragging{cursor:grabbing}
+    .chip-dragging{opacity:.8}
+    .btn-wrap.dragging{opacity:.82}
+    .btn-wrap.drop-target::before{content:''; position:absolute; inset:-10px; border-radius:28px; border:2px dashed rgba(15,23,42,.22); pointer-events:none; z-index:1}
     @keyframes chipSpotlightPulse{
       0%{opacity:0; transform:scale(.9)}
       45%{opacity:.95; transform:scale(1.02)}
@@ -187,6 +192,7 @@
       : null;
     let chipSequence = 0;
     let layoutScheduled = false;
+    const dragState = { btn: null, wrap: null, pendingCommit: false };
     const storage = (() => {
       try { return typeof localStorage !== 'undefined' ? localStorage : null; }
       catch (_) { return null; }
@@ -403,6 +409,8 @@
 
     if(list){
       window.addEventListener('resize', scheduleLayout);
+      list.addEventListener('dragover', handleListDragOver);
+      list.addEventListener('drop', handleListDrop);
     }
 
     const isTypingContext = (el) => {
@@ -777,6 +785,175 @@
       scheduleLayout();
     }
 
+    function registerChipDragHandlers(btn){
+      if(!btn || btn.dataset.dragBound === '1') return;
+      btn.addEventListener('dragstart', handleChipDragStart);
+      btn.addEventListener('dragend', handleChipDragEnd);
+      btn.addEventListener('dragenter', handleChipDragEnter);
+      btn.addEventListener('dragleave', handleChipDragLeave);
+      btn.addEventListener('dragover', handleChipDragOver);
+      btn.addEventListener('drop', handleChipDrop);
+      btn.dataset.dragBound = '1';
+    }
+
+    function syncChipDragCapability(btn){
+      if(!btn) return;
+      if(layoutConfig.mode === 'stack'){
+        btn.setAttribute('draggable', 'true');
+      }else{
+        btn.removeAttribute('draggable');
+        btn.classList.remove('chip-dragging');
+      }
+    }
+
+    function syncStackDragState(){
+      if(!list) return;
+      const enable = layoutConfig.mode === 'stack';
+      const wraps = Array.from(list.querySelectorAll('.btn-wrap'));
+      wraps.forEach(wrap => {
+        if(!(wrap instanceof HTMLElement)) return;
+        wrap.classList.remove('dragging', 'drop-target');
+        const btn = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
+        if(!btn) return;
+        if(enable){
+          btn.setAttribute('draggable', 'true');
+        }else{
+          btn.removeAttribute('draggable');
+          btn.classList.remove('chip-dragging');
+        }
+      });
+    }
+
+    function resequenceWrapOrder(){
+      if(!list) return;
+      const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement);
+      wraps.forEach((wrap, index) => {
+        wrap.dataset.createdAt = String(index);
+      });
+      chipSequence = wraps.length;
+    }
+
+    function clearDragHighlights(){
+      if(!list) return;
+      list.querySelectorAll('.btn-wrap.drop-target').forEach(node => {
+        if(node instanceof HTMLElement) node.classList.remove('drop-target');
+      });
+    }
+
+    function finalizeDrag(){
+      if(!list) return;
+      if(dragState.wrap instanceof HTMLElement){
+        dragState.wrap.classList.remove('dragging');
+      }
+      if(dragState.btn instanceof HTMLElement){
+        dragState.btn.classList.remove('chip-dragging');
+      }
+      clearDragHighlights();
+      if(dragState.pendingCommit){
+        resequenceWrapOrder();
+        saveChips();
+      }
+      dragState.btn = null;
+      dragState.wrap = null;
+      dragState.pendingCommit = false;
+      scheduleLayout();
+    }
+
+    function handleChipDragStart(event){
+      if(layoutConfig.mode !== 'stack'){
+        event.preventDefault();
+        return;
+      }
+      const btn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+      if(!btn) return;
+      const wrap = btn.closest('.btn-wrap');
+      if(!(wrap instanceof HTMLElement)){
+        event.preventDefault();
+        return;
+      }
+      dragState.btn = btn;
+      dragState.wrap = wrap;
+      dragState.pendingCommit = false;
+      wrap.classList.add('dragging');
+      btn.classList.add('chip-dragging');
+      if(event.dataTransfer){
+        event.dataTransfer.effectAllowed = 'move';
+        try{ event.dataTransfer.setData('text/plain', btn.dataset.label || ''); }
+        catch(_){}
+      }
+    }
+
+    function handleChipDragEnd(){
+      finalizeDrag();
+    }
+
+    function handleChipDragEnter(event){
+      if(layoutConfig.mode !== 'stack') return;
+      const targetBtn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+      if(!targetBtn) return;
+      const targetWrap = targetBtn.closest('.btn-wrap');
+      if(!(targetWrap instanceof HTMLElement)) return;
+      if(dragState.wrap && targetWrap !== dragState.wrap){
+        targetWrap.classList.add('drop-target');
+      }
+    }
+
+    function handleChipDragLeave(event){
+      const targetBtn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+      if(!targetBtn) return;
+      const targetWrap = targetBtn.closest('.btn-wrap');
+      if(!(targetWrap instanceof HTMLElement)) return;
+      if(targetWrap !== dragState.wrap){
+        targetWrap.classList.remove('drop-target');
+      }
+    }
+
+    function handleChipDragOver(event){
+      if(layoutConfig.mode !== 'stack') return;
+      if(!dragState.wrap) return;
+      event.preventDefault();
+      if(event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleChipDrop(event){
+      if(layoutConfig.mode !== 'stack') return;
+      if(!dragState.wrap) return;
+      const sourceWrap = dragState.wrap;
+      const targetBtn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+      if(!targetBtn) return;
+      const targetWrap = targetBtn.closest('.btn-wrap');
+      if(!(targetWrap instanceof HTMLElement)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      targetWrap.classList.remove('drop-target');
+      if(targetWrap === sourceWrap) return;
+      const rect = targetWrap.getBoundingClientRect();
+      const shouldInsertAfter = event.clientY > rect.top + rect.height / 2;
+      const referenceNode = shouldInsertAfter ? targetWrap.nextSibling : targetWrap;
+      if(referenceNode !== sourceWrap){
+        list.insertBefore(sourceWrap, referenceNode);
+        dragState.pendingCommit = true;
+      }
+    }
+
+    function handleListDragOver(event){
+      if(layoutConfig.mode !== 'stack') return;
+      if(!dragState.wrap) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if(target && target.closest('.btn-item')) return;
+      event.preventDefault();
+      if(event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleListDrop(event){
+      if(layoutConfig.mode !== 'stack') return;
+      if(!dragState.wrap) return;
+      event.preventDefault();
+      dragState.pendingCommit = true;
+      list.appendChild(dragState.wrap);
+      finalizeDrag();
+    }
+
     const getSpotlightPad = (wrap) => {
       if(!(wrap instanceof HTMLElement)) return 0;
       const value = Number(wrap.dataset.spotlightPad || '0');
@@ -802,6 +979,8 @@
       btn.dataset.metrics = '0';
       btn.textContent = maybeAddEmoji(label);
       if(typeof options.displayText === 'string') btn.textContent = options.displayText;
+      registerChipDragHandlers(btn);
+      syncChipDragCapability(btn);
       if(chipResizeObserver) chipResizeObserver.observe(btn);
       btn.title='Click to cycle size (+30%, +60%, +90%, +120%, +150%). Shift+Click resets. Press Delete to remove';
       if(options.color){
@@ -886,11 +1065,15 @@
     function setLayoutMode(mode, { force = false, reorder = true } = {}){
       const next = mode === 'masonry' ? 'masonry' : mode === 'stack' ? 'stack' : 'flow';
       const changed = layoutConfig.mode !== next;
+      if(next !== 'stack' && dragState.wrap){
+        finalizeDrag();
+      }
       layoutConfig.mode = next;
       if(reorder && (next === 'flow' || next === 'stack')){
         restoreCreationOrder();
       }
       updateLayoutModeUI();
+      syncStackDragState();
       if(changed || force){
         scheduleLayout();
       }
