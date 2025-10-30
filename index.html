@@ -70,10 +70,18 @@
       padding:6px;
     }
 
-    .chip{border:1px solid #e5e7eb; background:#fff; color:#1f2937; border-radius:18px; padding:calc(.5rem * var(--chip-font-scale, 1)) calc(1rem * var(--chip-font-scale, 1)); font-size:calc(.95rem * var(--chip-font-scale, 1)); font-weight:500; box-shadow:0 1px 2px rgba(0,0,0,.05); transition: padding .22s ease, font-size .22s ease, box-shadow .22s ease, background-color .22s ease, border-color .22s ease, transform .12s ease}
+    .chip{border:1px solid #e5e7eb; background:#fff; color:#1f2937; border-radius:18px; padding:calc(.5rem * var(--chip-font-scale, 1)) calc(1rem * var(--chip-font-scale, 1)); font-size:calc(.95rem * var(--chip-font-scale, 1)); font-weight:500; box-shadow:0 1px 2px rgba(0,0,0,.05); transition: padding .22s ease, font-size .22s ease, box-shadow .22s ease, background-color .22s ease, border-color .22s ease, transform .12s ease, margin .22s ease; position:relative; overflow:visible; z-index:0; margin:0}
     .chip:hover{box-shadow:0 6px 16px rgba(0,0,0,.08); transform:translateY(-1px); border-color:#67e8f9; background:#ecfeff}
     .chip:focus{outline:none; box-shadow:var(--ring)}
     .chip-colored:hover{filter:brightness(1.08)}
+    .chip-spotlight{border-color:#0ea5e9; box-shadow:0 20px 52px rgba(14,165,233,.4), 0 0 0 3px rgba(6,182,212,.55), 0 0 18px rgba(34,211,238,.6); background-image:linear-gradient(135deg, rgba(14,165,233,.16), rgba(6,182,212,.08)); z-index:2}
+    .chip-spotlight::before{content:''; position:absolute; inset:-18px; border-radius:inherit; background:radial-gradient(circle, rgba(34,211,238,.45), transparent 55%); opacity:.9; filter:blur(12px); z-index:-1; pointer-events:none}
+    .chip-spotlight::after{content:''; position:absolute; inset:-6px; border-radius:inherit; border:3px solid rgba(6,182,212,.55); opacity:0; animation:chipSpotlightPulse 1.4s ease-in-out infinite; pointer-events:none; will-change:transform,opacity}
+    @keyframes chipSpotlightPulse{
+      0%{opacity:0; transform:scale(.9)}
+      45%{opacity:.95; transform:scale(1.02)}
+      100%{opacity:0; transform:scale(1.12)}
+    }
 
     /* Grow behavior for spotlight (no overlap) */
     .btn-item{transform-origin:center center}
@@ -81,11 +89,12 @@
       position:absolute;
       display:block;
       margin:0;
+      padding:0;
       top:0;
       left:0;
       transform-origin:top left;
-      transition:transform .22s ease;
-      will-change:transform;
+      transition:transform .22s ease, padding .22s ease;
+      will-change:transform, padding;
     }
 
     /* Tooltip */
@@ -166,6 +175,8 @@
     const EXPORT_FILENAME = 'discussion-chips.json';
     const layoutConfig = { step: 4, gutter: 8, chipScale: 1, mode: 'flow' };
     const SPOTLIGHT_STEPS = [0, 0.3, 0.6, 0.9, 1.2, 1.5];
+    const CHIP_SPOTLIGHT_CLASS = 'chip-spotlight';
+    const CHIP_SPOTLIGHT_PAD = 48;
     const raf = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
       ? window.requestAnimationFrame.bind(window)
       : (cb) => setTimeout(cb, 16);
@@ -257,9 +268,12 @@
         const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
         const itemWidth = chip ? chip.offsetWidth : wrap.offsetWidth;
         const itemHeight = chip ? chip.offsetHeight : wrap.offsetHeight;
-        if(itemWidth <= 0 || itemHeight <= 0) return;
+        const padExtra = getSpotlightPad(wrap);
+        const widthWithPad = itemWidth + padExtra;
+        const heightWithPad = itemHeight + padExtra;
+        if(widthWithPad <= 0 || heightWithPad <= 0) return;
 
-        const unitsNeeded = Math.min(columns, Math.max(1, Math.ceil((itemWidth + gutter) / unit)));
+        const unitsNeeded = Math.min(columns, Math.max(1, Math.ceil((widthWithPad + gutter) / unit)));
         let bestIndex = 0;
         let bestHeight = Number.POSITIVE_INFINITY;
         const searchLimit = columns - unitsNeeded;
@@ -281,11 +295,11 @@
         const finalTop = padTop + bestHeight;
         wrap.style.transform = `translate3d(${finalLeft}px, ${finalTop}px, 0)`;
 
-        const newHeight = bestHeight + itemHeight + gutter;
+        const newHeight = bestHeight + heightWithPad + gutter;
         for(let j = bestIndex; j < bestIndex + unitsNeeded; j++){
           columnHeights[j] = newHeight;
         }
-        maxBottom = Math.max(maxBottom, bestHeight + itemHeight);
+        maxBottom = Math.max(maxBottom, bestHeight + heightWithPad);
       });
 
       const totalHeight = padTop + Math.max(0, maxBottom + padBottom);
@@ -337,7 +351,10 @@
         // Measure the interactive button itself so spacing stays accurate while wraps animate.
         const itemWidth = chip ? chip.offsetWidth : wrap.offsetWidth;
         const itemHeight = chip ? chip.offsetHeight : wrap.offsetHeight;
-        if(cursorX > 0 && cursorX + itemWidth > availableWidth){
+        const padExtra = getSpotlightPad(wrap);
+        const widthWithPad = itemWidth + padExtra;
+        const heightWithPad = itemHeight + padExtra;
+        if(cursorX > 0 && cursorX + widthWithPad > availableWidth){
           cursorX = 0;
           cursorY += rowHeight + gutter;
           rowHeight = 0;
@@ -345,9 +362,9 @@
         const finalLeft = padLeft + cursorX;
         const finalTop = padTop + cursorY;
         wrap.style.transform = `translate3d(${finalLeft}px, ${finalTop}px, 0)`;
-        cursorX += itemWidth + gutter;
-        rowHeight = Math.max(rowHeight, itemHeight);
-        maxBottom = Math.max(maxBottom, cursorY + itemHeight);
+        cursorX += widthWithPad + gutter;
+        rowHeight = Math.max(rowHeight, heightWithPad);
+        maxBottom = Math.max(maxBottom, cursorY + heightWithPad);
       });
       const totalHeight = padTop + Math.max(0, maxBottom + padBottom);
       list.style.height = totalHeight + 'px';
@@ -646,10 +663,51 @@
       saveChips();
     }
 
+    function setWrapSpotlightState(wrap, pad){
+      if(!wrap) return;
+      const next = Number.isFinite(pad) ? Math.max(0, pad) : 0;
+      if(next > 0){
+        wrap.dataset.spotlightPad = String(next);
+        wrap.style.padding = (next / 2) + 'px';
+      }else{
+        delete wrap.dataset.spotlightPad;
+        wrap.style.padding = '0px';
+      }
+    }
+
+    function toggleChipSpotlight(btn){
+      if(!btn) return;
+      const host = btn.closest('.btn-wrap');
+      const activate = !btn.classList.contains(CHIP_SPOTLIGHT_CLASS);
+      if(list){
+        list.querySelectorAll('.btn-item.' + CHIP_SPOTLIGHT_CLASS).forEach(other=>{
+          if(other === btn) return;
+          other.classList.remove(CHIP_SPOTLIGHT_CLASS);
+          const otherHost = other.closest('.btn-wrap');
+          setWrapSpotlightState(otherHost, 0);
+        });
+      }
+      if(activate){
+        btn.classList.add(CHIP_SPOTLIGHT_CLASS);
+        setWrapSpotlightState(host, CHIP_SPOTLIGHT_PAD);
+      }else{
+        btn.classList.remove(CHIP_SPOTLIGHT_CLASS);
+        setWrapSpotlightState(host, 0);
+      }
+      scheduleLayout();
+    }
+
+    const getSpotlightPad = (wrap) => {
+      if(!(wrap instanceof HTMLElement)) return 0;
+      const value = Number(wrap.dataset.spotlightPad || '0');
+      return Number.isFinite(value) ? Math.max(0, value) : 0;
+    };
+
     function createChip(label, options = {}){
       const wrap=document.createElement('div');
       wrap.className='btn-wrap';
       wrap.style.transform='translate3d(0,0,0)';
+      wrap.style.padding='0px';
       const providedOrder = options.createdAt;
       const numericOrder = Number(providedOrder);
       if(Number.isFinite(numericOrder)){
@@ -674,6 +732,12 @@
         clearChipColor(btn);
       }
       btn.addEventListener('click',(event)=>{
+        if(event.ctrlKey || event.metaKey){
+          event.preventDefault();
+          toggleChipSpotlight(btn);
+          btn.focus();
+          return;
+        }
         if(event.shiftKey){
           event.preventDefault();
           const currentStage = Number(btn.dataset.scaleStage || '0');
