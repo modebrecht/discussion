@@ -309,11 +309,9 @@
     function refreshChipMetrics(){
       if (!list) return;
       const buttons = Array.from(list.querySelectorAll('.btn-item'));
-      buttons.forEach(btn => { btn.dataset.metrics = '0'; });
       buttons.forEach(btn => {
         const stage = Number(btn.dataset.scaleStage || '0');
-        updateBaseMetrics(btn);
-        applyStageToChip(btn, stage);
+        applyStageToChip(btn, stage, { remeasure: true });
         if(chipResizeObserver) chipResizeObserver.observe(btn);
       });
       scheduleLayout();
@@ -484,6 +482,36 @@
     function maybeAddEmoji(label){ if(!emojiToggle||!emojiToggle.checked) return label; if(startsWithEmoji(label)) return label; const em=detectEmoji(label); return em? (em+' '+label):label; }
 
     // ===== Chip helpers =====
+    function clearChipInlineSizing(btn){
+      if(!(btn instanceof HTMLElement)) return;
+      const { style } = btn;
+      style.fontSize = '';
+      style.paddingLeft = '';
+      style.paddingRight = '';
+      style.paddingTop = '';
+      style.paddingBottom = '';
+    }
+
+    function forceChipStyleSync(btn){
+      if(!(btn instanceof HTMLElement)) return;
+      // Access layout to flush pending style updates before measuring.
+      void btn.offsetWidth;
+    }
+
+    function suspendChipTransitions(btn){
+      if(!(btn instanceof HTMLElement)) return () => {};
+      const { style } = btn;
+      const prev = style.transition;
+      style.transition = 'none';
+      // Flush so the no-transition state takes effect immediately.
+      void btn.offsetWidth;
+      return () => {
+        style.transition = prev;
+        // Flush again so re-enabled transitions apply to subsequent changes.
+        void btn.offsetWidth;
+      };
+    }
+
     function updateBaseMetrics(btn){
       const stage = Number(btn.dataset.scaleStage || '0');
       const factor = 1 + (SPOTLIGHT_STEPS[stage] || 0);
@@ -504,7 +532,17 @@
     function applyStageToChip(btn, stage, { remeasure = false } = {}){
       let next = Number(stage);
       if(!Number.isFinite(next) || next < 0 || next >= SPOTLIGHT_STEPS.length) next = 0;
-      if(remeasure || btn.dataset.metrics!=='1') updateBaseMetrics(btn);
+      if(remeasure){
+        const restoreTransitions = suspendChipTransitions(btn);
+        clearChipInlineSizing(btn);
+        forceChipStyleSync(btn);
+        btn.dataset.scaleStage = '0';
+        btn.dataset.metrics = '0';
+        updateBaseMetrics(btn);
+        restoreTransitions();
+      }else if(btn.dataset.metrics!=='1'){
+        updateBaseMetrics(btn);
+      }
       btn.dataset.scaleStage = String(next);
       const factor = 1 + SPOTLIGHT_STEPS[next];
       const baseFont = Number(btn.dataset.baseFont);
@@ -514,14 +552,17 @@
       const basePadBottom = Number(btn.dataset.basePadBottom);
       const style = btn.style;
       if(Math.abs(factor - 1) < 0.0001){
-        style.fontSize = '';
-        style.paddingLeft = '';
-        style.paddingRight = '';
-        style.paddingTop = '';
-        style.paddingBottom = '';
+        clearChipInlineSizing(btn);
         return;
       }
-      const format = (base) => Number.isFinite(base) ? (base * factor).toFixed(3).replace(/\.?0+$/,'') + 'px' : '';
+      const format = (base) => {
+        if(!Number.isFinite(base)) return '';
+        const value = base * factor;
+        if(Math.abs(value) < 1e-4) return '0px';
+        const fixed = value.toFixed(3);
+        const trimmed = fixed.replace(/\.?0+$/,'');
+        return (trimmed === '' ? '0' : trimmed) + 'px';
+      };
       style.fontSize = format(baseFont);
       style.paddingLeft = format(basePadLeft);
       style.paddingRight = format(basePadRight);
