@@ -164,7 +164,7 @@
     const SETTINGS_KEY = 'discussion.settings.v1';
     const EXPORT_FILENAME = 'discussion-chips.json';
     const layoutConfig = { step: 4, gutter: 8, chipScale: 1, mode: 'flow' };
-    const SPOTLIGHT_STEPS = [0, 0.3, 0.6, 0.9];
+    const SPOTLIGHT_STEPS = [0, 0.3, 0.6, 0.9, 1.2, 1.5];
     const raf = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
       ? window.requestAnimationFrame.bind(window)
       : (cb) => setTimeout(cb, 16);
@@ -664,7 +664,7 @@
       btn.textContent = maybeAddEmoji(label);
       if(typeof options.displayText === 'string') btn.textContent = options.displayText;
       if(chipResizeObserver) chipResizeObserver.observe(btn);
-      btn.title='Click to cycle size (+30%, +60%, +90%, reset). Press Delete to remove';
+      btn.title='Click to cycle size (+30%, +60%, +90%, +120%, +150%). Shift+Click resets. Press Delete to remove';
       if(options.color){
         setChipColor(btn, options.color);
       }else if(!options.skipRandom && randToggle && randToggle.checked){
@@ -672,8 +672,19 @@
       }else{
         clearChipColor(btn);
       }
-      btn.addEventListener('click',()=>{
-        cycleChipStage(btn);
+      btn.addEventListener('click',(event)=>{
+        if(event.shiftKey){
+          event.preventDefault();
+          const currentStage = Number(btn.dataset.scaleStage || '0');
+          if(currentStage !== 0){
+            updateBaseMetrics(btn);
+            applyStageToChip(btn, 0);
+            scheduleLayout();
+            saveChips();
+          }
+        }else{
+          cycleChipStage(btn);
+        }
         btn.focus();
       });
       btn.addEventListener('keydown',(e)=>{
