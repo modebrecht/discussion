@@ -145,6 +145,7 @@
               <input id="chipMargin" type="range" min="0" max="32" step="1" value="8" />
             </label>
             <button id="masonryToggle" type="button" class="btn" title="Toggle dense masonry packing for chips">Masonry</button>
+            <button id="oneLineToggle" type="button" class="btn" title="Show chips in a single vertical column">OneLine</button>
             <input id="importFile" type="file" accept="application/json" style="display:none">
           </div>
         </div>
@@ -167,6 +168,7 @@
     const importBtn = document.getElementById('importBtn');
     const importFileInput = document.getElementById('importFile');
     const masonryToggleBtn = document.getElementById('masonryToggle');
+    const oneLineToggleBtn = document.getElementById('oneLineToggle');
     const chipSizeInput = document.getElementById('chipSize');
     const chipMarginInput = document.getElementById('chipMargin');
 
@@ -336,6 +338,26 @@
           availableWidth,
           gutter
         });
+        list.style.height = totalHeight + 'px';
+        return;
+      }
+
+      if(layoutConfig.mode === 'stack'){
+        let cursorY = 0;
+        let maxBottom = 0;
+        wraps.forEach(wrap => {
+          if(!(wrap instanceof HTMLElement)) return;
+          const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
+          const itemHeight = chip ? chip.offsetHeight : wrap.offsetHeight;
+          const padExtra = getSpotlightPad(wrap);
+          const heightWithPad = itemHeight + padExtra;
+          const finalTop = padTop + cursorY;
+          wrap.style.transform = `translate3d(${padLeft}px, ${finalTop}px, 0)`;
+          cursorY += heightWithPad;
+          maxBottom = Math.max(maxBottom, cursorY);
+          cursorY += gutter;
+        });
+        const totalHeight = padTop + Math.max(0, maxBottom + padBottom);
         list.style.height = totalHeight + 'px';
         return;
       }
@@ -848,18 +870,24 @@
     }
 
     function updateLayoutModeUI(){
-      const isMasonry = layoutConfig.mode === 'masonry';
+      const mode = layoutConfig.mode;
+      const isMasonry = mode === 'masonry';
+      const isStack = mode === 'stack';
       if(masonryToggleBtn){
         masonryToggleBtn.classList.toggle('btn-primary', isMasonry);
         masonryToggleBtn.setAttribute('aria-pressed', String(isMasonry));
       }
+      if(oneLineToggleBtn){
+        oneLineToggleBtn.classList.toggle('btn-primary', isStack);
+        oneLineToggleBtn.setAttribute('aria-pressed', String(isStack));
+      }
     }
 
     function setLayoutMode(mode, { force = false, reorder = true } = {}){
-      const next = mode === 'masonry' ? 'masonry' : 'flow';
+      const next = mode === 'masonry' ? 'masonry' : mode === 'stack' ? 'stack' : 'flow';
       const changed = layoutConfig.mode !== next;
       layoutConfig.mode = next;
-      if(reorder && next === 'flow'){
+      if(reorder && (next === 'flow' || next === 'stack')){
         restoreCreationOrder();
       }
       updateLayoutModeUI();
@@ -972,6 +1000,16 @@
     if(masonryToggleBtn){
       masonryToggleBtn.addEventListener('click', ()=>{
         const nextMode = layoutConfig.mode === 'masonry' ? 'flow' : 'masonry';
+        setLayoutMode(nextMode, { force: true });
+        if(nextMode === 'flow'){
+          saveChips();
+        }
+      });
+    }
+
+    if(oneLineToggleBtn){
+      oneLineToggleBtn.addEventListener('click', ()=>{
+        const nextMode = layoutConfig.mode === 'stack' ? 'flow' : 'stack';
         setLayoutMode(nextMode, { force: true });
         if(nextMode === 'flow'){
           saveChips();
