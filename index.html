@@ -70,13 +70,13 @@
       padding:6px;
     }
 
-    .chip{border:1px solid #e5e7eb; background:#fff; color:#1f2937; border-radius:18px; padding:calc(.5rem * var(--chip-font-scale, 1)) calc(1rem * var(--chip-font-scale, 1)); font-size:calc(.95rem * var(--chip-font-scale, 1)); font-weight:500; box-shadow:0 1px 2px rgba(0,0,0,.05); transition: padding .22s ease, font-size .22s ease, box-shadow .22s ease, background-color .22s ease, border-color .22s ease, transform .12s ease, margin .22s ease; position:relative; overflow:visible; z-index:0; margin:0}
+    .chip{border:1px solid #e5e7eb; background:#fff; color:#1f2937; border-radius:18px; padding:calc(.5rem * var(--chip-font-scale, 1)) calc(1rem * var(--chip-font-scale, 1)); font-size:calc(.95rem * var(--chip-font-scale, 1)); font-weight:500; box-shadow:0 1px 2px rgba(0,0,0,.05); transition: padding .22s ease, font-size .22s ease, box-shadow .22s ease, background-color .22s ease, border-color .22s ease, transform .12s ease, margin .22s ease; position:relative; overflow:visible; z-index:0; margin:0; --spotlight-border:rgba(6,182,212,.55); --spotlight-shadow-main:rgba(14,165,233,.4); --spotlight-shadow-ring:rgba(6,182,212,.55); --spotlight-shadow-glow:rgba(34,211,238,.6); --spotlight-grad-start:rgba(14,165,233,.16); --spotlight-grad-end:rgba(6,182,212,.08); --spotlight-halo:rgba(34,211,238,.45); --spotlight-pulse-border:rgba(6,182,212,.55)}
     .chip:hover{box-shadow:0 6px 16px rgba(0,0,0,.08); transform:translateY(-1px); border-color:#67e8f9; background:#ecfeff}
     .chip:focus{outline:none; box-shadow:var(--ring)}
     .chip-colored:hover{filter:brightness(1.08)}
-    .chip-spotlight{border-color:#0ea5e9; box-shadow:0 20px 52px rgba(14,165,233,.4), 0 0 0 3px rgba(6,182,212,.55), 0 0 18px rgba(34,211,238,.6); background-image:linear-gradient(135deg, rgba(14,165,233,.16), rgba(6,182,212,.08)); z-index:2}
-    .chip-spotlight::before{content:''; position:absolute; inset:-18px; border-radius:inherit; background:radial-gradient(circle, rgba(34,211,238,.45), transparent 55%); opacity:.9; filter:blur(12px); z-index:-1; pointer-events:none}
-    .chip-spotlight::after{content:''; position:absolute; inset:-6px; border-radius:inherit; border:3px solid rgba(6,182,212,.55); opacity:0; animation:chipSpotlightPulse 1.4s ease-in-out infinite; pointer-events:none; will-change:transform,opacity}
+    .chip-spotlight{border-color:var(--spotlight-border); box-shadow:0 20px 52px var(--spotlight-shadow-main), 0 0 0 3px var(--spotlight-shadow-ring), 0 0 18px var(--spotlight-shadow-glow); background-image:linear-gradient(135deg, var(--spotlight-grad-start), var(--spotlight-grad-end)); z-index:2}
+    .chip-spotlight::before{content:''; position:absolute; inset:-18px; border-radius:inherit; background:radial-gradient(circle, var(--spotlight-halo), transparent 55%); opacity:.9; filter:blur(12px); z-index:-1; pointer-events:none}
+    .chip-spotlight::after{content:''; position:absolute; inset:-6px; border-radius:inherit; border:3px solid var(--spotlight-pulse-border); opacity:0; animation:chipSpotlightPulse 1.4s ease-in-out infinite; pointer-events:none; will-change:transform,opacity}
     @keyframes chipSpotlightPulse{
       0%{opacity:0; transform:scale(.9)}
       45%{opacity:.95; transform:scale(1.02)}
@@ -516,6 +516,61 @@
       delete btn.dataset.color;
     }
 
+    const DEFAULT_SPOTLIGHT_HEX = '#0EA5E9';
+    const SPOTLIGHT_STYLE_PROPS = [
+      '--spotlight-border',
+      '--spotlight-shadow-main',
+      '--spotlight-shadow-ring',
+      '--spotlight-shadow-glow',
+      '--spotlight-grad-start',
+      '--spotlight-grad-end',
+      '--spotlight-halo',
+      '--spotlight-pulse-border'
+    ];
+
+    function normalizeHex(value){
+      if(typeof value !== 'string') return null;
+      const match = value.trim().match(/^#?([0-9a-f]{6})$/i);
+      return match ? '#' + match[1].toUpperCase() : null;
+    }
+
+    function rgbaFromHex(hex, alpha){
+      const { r, g, b } = hexToRgb(hex);
+      const numeric = Number(alpha);
+      const clamped = Number.isFinite(numeric) ? Math.min(1, Math.max(0, numeric)) : 1;
+      const formattedAlpha = clamped.toFixed(3).replace(/\.?0+$/,'');
+      return `rgba(${r}, ${g}, ${b}, ${formattedAlpha})`;
+    }
+
+    function getSpotlightBaseColor(btn){
+      if(!btn) return DEFAULT_SPOTLIGHT_HEX;
+      const datasetHex = normalizeHex(btn.dataset.color || '');
+      if(datasetHex) return datasetHex;
+      const stored = normalizeHex(btn.dataset.spotlightColor || '');
+      if(stored) return stored;
+      return DEFAULT_SPOTLIGHT_HEX;
+    }
+
+    function applySpotlightTheme(btn, hex){
+      if(!btn) return;
+      const base = normalizeHex(hex) || DEFAULT_SPOTLIGHT_HEX;
+      btn.dataset.spotlightColor = base;
+      btn.style.setProperty('--spotlight-border', shade(base, -18));
+      btn.style.setProperty('--spotlight-shadow-main', rgbaFromHex(base, 0.42));
+      btn.style.setProperty('--spotlight-shadow-ring', rgbaFromHex(shade(base, -12), 0.58));
+      btn.style.setProperty('--spotlight-shadow-glow', rgbaFromHex(shade(base, 16), 0.62));
+      btn.style.setProperty('--spotlight-grad-start', rgbaFromHex(shade(base, 24), 0.24));
+      btn.style.setProperty('--spotlight-grad-end', rgbaFromHex(shade(base, -14), 0.14));
+      btn.style.setProperty('--spotlight-halo', rgbaFromHex(shade(base, 12), 0.55));
+      btn.style.setProperty('--spotlight-pulse-border', rgbaFromHex(shade(base, -8), 0.6));
+    }
+
+    function clearSpotlightTheme(btn){
+      if(!btn) return;
+      SPOTLIGHT_STYLE_PROPS.forEach(prop => btn.style.removeProperty(prop));
+      delete btn.dataset.spotlightColor;
+    }
+
     // ===== Emoji utilities =====
     function startsWithEmoji(str){ const s=(str||'').trim(); if(!s) return false; const cp=s.codePointAt(0); return (cp>=0x1F300&&cp<=0x1FAFF)||(cp>=0x2600&&cp<=0x27BF); }
     function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
@@ -683,15 +738,18 @@
         list.querySelectorAll('.btn-item.' + CHIP_SPOTLIGHT_CLASS).forEach(other=>{
           if(other === btn) return;
           other.classList.remove(CHIP_SPOTLIGHT_CLASS);
+          clearSpotlightTheme(other);
           const otherHost = other.closest('.btn-wrap');
           setWrapSpotlightState(otherHost, 0);
         });
       }
       if(activate){
         btn.classList.add(CHIP_SPOTLIGHT_CLASS);
+        applySpotlightTheme(btn, getSpotlightBaseColor(btn));
         setWrapSpotlightState(host, CHIP_SPOTLIGHT_PAD);
       }else{
         btn.classList.remove(CHIP_SPOTLIGHT_CLASS);
+        clearSpotlightTheme(btn);
         setWrapSpotlightState(host, 0);
       }
       scheduleLayout();
