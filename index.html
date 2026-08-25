@@ -11,10 +11,10 @@
       --bg:#f6f7fb;
       --ink:#1f2937;
       --muted:#6b7280;
-      --accent:#16a34a;    /* green */
-      --accent-2:#06b6d4;  /* cyan */
-      --panel:#46474A;     /* anthracite */
-      --panel-ink:#f1f5f9; /* light ink on panel */
+      --accent:#16a34a;
+      --accent-2:#06b6d4;
+      --panel:#46474A;
+      --panel-ink:#f1f5f9;
       --shadow:0 10px 30px rgba(0,0,0,.08);
       --ring: 0 0 0 3px rgba(6, 182, 212, .35);
       --radius: 12px;
@@ -32,14 +32,25 @@
 
     /* Header / toolbar */
     .toolbar{background:#fff; box-shadow:var(--shadow);}
-    .toolbar-inner{max-width:64rem; margin:0 auto; padding:.75rem 1rem; display:flex; flex-wrap:wrap; align-items:center; gap:.75rem}
+    .toolbar-inner{max-width:80rem; margin:0 auto; padding:.75rem 1rem; display:flex; flex-wrap:nowrap; align-items:center; gap:.65rem}
+    .toolbar-inner > div:first-child{flex:0 0 auto}
     .logo-pill{height:24px; width:24px; border-radius:12px; display:grid; place-items:center; font:600 12px/1.1 ui-sans-serif; background:var(--panel); color:var(--panel-ink)}
-    .title{font-weight:600; font-size:1.125rem; letter-spacing:.01em}
-    .save-controls{margin-inline-start:auto; display:flex; align-items:center; gap:.4rem; min-width:0}
-    .save-select{max-width:180px; min-width:132px; border:1px solid #d1d5db; background:#fff; color:#111827; border-radius:var(--radius); padding:.4rem 1.8rem .4rem .65rem; font-size:.875rem; font-weight:600; line-height:1.1}
+    .title{font-weight:600; font-size:1.125rem; letter-spacing:.01em; white-space:nowrap}
+    .save-controls{margin-inline-start:.45rem; display:flex; align-items:center; gap:.4rem; min-width:0; flex:0 0 auto; order:2}
+    .save-select{max-width:160px; min-width:128px; border:1px solid #d1d5db; background:#fff; color:#111827; border-radius:var(--radius); padding:.4rem 1.8rem .4rem .65rem; font-size:.875rem; font-weight:600; line-height:1.1}
     .save-select:focus{outline:none; border-color:#22d3ee; box-shadow:var(--ring)}
-    .font-controls{margin-inline-start:0; display:flex; flex-wrap:wrap; align-items:center; gap:.5rem}
-    .font-pct{opacity:.9; font-size:.75rem; line-height:1}
+    .font-controls{margin-inline-start:auto; display:flex; flex-wrap:nowrap; align-items:center; gap:0; min-width:0; white-space:nowrap; order:1}
+    .font-controls #importBtn{border-radius:var(--radius) 0 0 var(--radius)}
+    .font-controls #exportBtn{border-radius:0 var(--radius) var(--radius) 0; margin-left:-1px; margin-right:.45rem}
+    .font-controls #decFont{border-radius:var(--radius) 0 0 var(--radius)}
+    .font-controls #incFont{border-radius:0 var(--radius) var(--radius) 0; margin-left:-1px; margin-right:.45rem}
+    .font-pct{opacity:.9; font-size:.75rem; line-height:1; white-space:nowrap}
+
+    @media (max-width: 760px){
+      .toolbar-inner{max-width:64rem; flex-wrap:wrap; gap:.5rem}
+      .save-controls{margin-inline-start:auto; order:2}
+      .font-controls{order:3; flex:1 1 100%; margin-inline-start:0}
+    }
 
     /* Layout */
     .container{max-width:64rem; margin:0 auto; padding:0 1rem 4rem}
@@ -171,7 +182,6 @@
   </main>
 
   <script>
-    // ===== DOM refs =====
     const list = document.getElementById('list');
     const input = document.getElementById('topicInput');
     const addBtn = document.getElementById('addBtn');
@@ -285,11 +295,7 @@
         }
       }
 
-      const firstSave = {
-        id: makeSaveId(),
-        name: nextSaveName([]),
-        chips: legacyChips
-      };
+      const firstSave = { id: makeSaveId(), name: nextSaveName([]), chips: legacyChips };
       const state = { activeId: firstSave.id, saves: [firstSave] };
       writeStorage(SAVE_STORAGE_KEY, JSON.stringify(state));
       if(legacyRaw) removeStorage(LEGACY_STORAGE_KEY);
@@ -297,15 +303,8 @@
     }
 
     let saveState = loadSaveState();
-
-    function persistSaveState(){
-      writeStorage(SAVE_STORAGE_KEY, JSON.stringify(saveState));
-    }
-
-    function getActiveSave(){
-      return saveState.saves.find(save => save.id === saveState.activeId) || saveState.saves[0] || null;
-    }
-
+    function persistSaveState(){ writeStorage(SAVE_STORAGE_KEY, JSON.stringify(saveState)); }
+    function getActiveSave(){ return saveState.saves.find(save => save.id === saveState.activeId) || saveState.saves[0] || null; }
     function renderSaveSelector(){
       if(!saveSelect) return;
       saveSelect.innerHTML = '';
@@ -320,60 +319,31 @@
 
     const defaultSettings = { chipScale: 1, gutter: 8 };
     const sliderBounds = {
-      size: chipSizeInput ? {
-        min: parseFloat(chipSizeInput.min) || defaultSettings.chipScale,
-        max: parseFloat(chipSizeInput.max) || defaultSettings.chipScale,
-        step: parseFloat(chipSizeInput.step) || 0.005
-      } : { min: defaultSettings.chipScale, max: defaultSettings.chipScale, step: 0.005 },
-      margin: chipMarginInput ? {
-        min: parseFloat(chipMarginInput.min) || defaultSettings.gutter,
-        max: parseFloat(chipMarginInput.max) || defaultSettings.gutter,
-        step: parseFloat(chipMarginInput.step) || 1
-      } : { min: defaultSettings.gutter, max: defaultSettings.gutter, step: 1 }
+      size: chipSizeInput ? { min: parseFloat(chipSizeInput.min) || defaultSettings.chipScale, max: parseFloat(chipSizeInput.max) || defaultSettings.chipScale, step: parseFloat(chipSizeInput.step) || 0.005 } : { min: defaultSettings.chipScale, max: defaultSettings.chipScale, step: 0.005 },
+      margin: chipMarginInput ? { min: parseFloat(chipMarginInput.min) || defaultSettings.gutter, max: parseFloat(chipMarginInput.max) || defaultSettings.gutter, step: parseFloat(chipMarginInput.step) || 1 } : { min: defaultSettings.gutter, max: defaultSettings.gutter, step: 1 }
     };
-
     const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value));
-
     function loadSettings(){
       const raw = readStorage(SETTINGS_KEY);
       if(!raw) return { ...defaultSettings };
-      try{
-        const parsed = JSON.parse(raw);
-        return { ...defaultSettings, ...parsed };
-      }catch(err){
-        console.warn('Settings parse failed:', err);
-        return { ...defaultSettings };
-      }
+      try{ return { ...defaultSettings, ...JSON.parse(raw) }; }
+      catch(err){ console.warn('Settings parse failed:', err); return { ...defaultSettings }; }
     }
-
     let settingsReady = false;
-
     function persistSettings(){
       if(!settingsReady) return;
-      const payload = {
-        chipScale: Number(chipScale.toFixed(3)),
-        gutter: Math.round(layoutConfig.gutter)
-      };
-      writeStorage(SETTINGS_KEY, JSON.stringify(payload));
+      writeStorage(SETTINGS_KEY, JSON.stringify({ chipScale: Number(chipScale.toFixed(3)), gutter: Math.round(layoutConfig.gutter) }));
     }
-
     const uiSettings = loadSettings();
     layoutConfig.gutter = clampNumber(uiSettings.gutter, sliderBounds.margin.min, sliderBounds.margin.max);
     layoutConfig.step = Math.max(2, Math.min(8, Math.round(layoutConfig.gutter / 2))) || layoutConfig.step;
     if(chipMarginInput) chipMarginInput.value = String(Math.round(layoutConfig.gutter));
 
-    function layoutMasonry(wraps, {
-      padLeft,
-      padTop,
-      padBottom,
-      availableWidth,
-      gutter
-    }){
+    function layoutMasonry(wraps, { padLeft, padTop, padBottom, availableWidth, gutter }){
       const unit = Math.max(1, Math.round(layoutConfig.step || 4));
       const columns = Math.max(1, Math.floor((availableWidth + gutter) / unit));
       const columnHeights = new Array(columns).fill(0);
       let maxBottom = 0;
-
       wraps.forEach(wrap => {
         if(!(wrap instanceof HTMLElement)) return;
         const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
@@ -383,158 +353,88 @@
         const widthWithPad = itemWidth + padExtra;
         const heightWithPad = itemHeight + padExtra;
         if(widthWithPad <= 0 || heightWithPad <= 0) return;
-
         const unitsNeeded = Math.min(columns, Math.max(1, Math.ceil((widthWithPad + gutter) / unit)));
         let bestIndex = 0;
         let bestHeight = Number.POSITIVE_INFINITY;
         const searchLimit = columns - unitsNeeded;
-
         for(let i = 0; i <= searchLimit; i++){
           let spanHeight = 0;
           for(let j = i; j < i + unitsNeeded; j++){
             spanHeight = Math.max(spanHeight, columnHeights[j]);
             if(spanHeight >= bestHeight) break;
           }
-          if(spanHeight < bestHeight){
-            bestHeight = spanHeight;
-            bestIndex = i;
-            if(bestHeight === 0) break;
-          }
+          if(spanHeight < bestHeight){ bestHeight = spanHeight; bestIndex = i; if(bestHeight === 0) break; }
         }
-
-        const finalLeft = padLeft + bestIndex * unit;
-        const finalTop = padTop + bestHeight;
-        wrap.style.transform = `translate3d(${finalLeft}px, ${finalTop}px, 0)`;
-
+        wrap.style.transform = `translate3d(${padLeft + bestIndex * unit}px, ${padTop + bestHeight}px, 0)`;
         const newHeight = bestHeight + heightWithPad + gutter;
-        for(let j = bestIndex; j < bestIndex + unitsNeeded; j++){
-          columnHeights[j] = newHeight;
-        }
+        for(let j = bestIndex; j < bestIndex + unitsNeeded; j++) columnHeights[j] = newHeight;
         maxBottom = Math.max(maxBottom, bestHeight + heightWithPad);
       });
-
-      const totalHeight = padTop + Math.max(0, maxBottom + padBottom);
-      return totalHeight;
+      return padTop + Math.max(0, maxBottom + padBottom);
     }
 
     function layoutChipsNow(){
       if(!list) return;
       const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement);
-      if(!wraps.length){
-        list.style.height = '0px';
-        return;
-      }
+      if(!wraps.length){ list.style.height = '0px'; return; }
       const { gutter } = layoutConfig;
-      const styles = (typeof window !== 'undefined' && window.getComputedStyle)
-        ? window.getComputedStyle(list)
-        : null;
+      const styles = (typeof window !== 'undefined' && window.getComputedStyle) ? window.getComputedStyle(list) : null;
       const padLeft = styles ? parseFloat(styles.paddingLeft) || 0 : 0;
       const padRight = styles ? parseFloat(styles.paddingRight) || 0 : 0;
       const padTop = styles ? parseFloat(styles.paddingTop) || 0 : 0;
       const padBottom = styles ? parseFloat(styles.paddingBottom) || 0 : 0;
       const rawWidth = list.clientWidth - padLeft - padRight;
-      if(rawWidth <= 0){
-        list.style.height = '0px';
-        return;
-      }
+      if(rawWidth <= 0){ list.style.height = '0px'; return; }
       const availableWidth = Math.max(1, rawWidth);
-
       if(layoutConfig.mode === 'masonry'){
-        const totalHeight = layoutMasonry(wraps, {
-          padLeft,
-          padTop,
-          padBottom,
-          availableWidth,
-          gutter
-        });
-        list.style.height = totalHeight + 'px';
+        list.style.height = layoutMasonry(wraps, { padLeft, padTop, padBottom, availableWidth, gutter }) + 'px';
         return;
       }
-
       if(layoutConfig.mode === 'stack'){
-        let cursorY = 0;
-        let maxBottom = 0;
+        let cursorY = 0, maxBottom = 0;
         wraps.forEach(wrap => {
           if(!(wrap instanceof HTMLElement)) return;
           const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
-          const itemHeight = chip ? chip.offsetHeight : wrap.offsetHeight;
-          const padExtra = getSpotlightPad(wrap);
-          const heightWithPad = itemHeight + padExtra;
-          const finalTop = padTop + cursorY;
-          wrap.style.transform = `translate3d(${padLeft}px, ${finalTop}px, 0)`;
+          const heightWithPad = (chip ? chip.offsetHeight : wrap.offsetHeight) + getSpotlightPad(wrap);
+          wrap.style.transform = `translate3d(${padLeft}px, ${padTop + cursorY}px, 0)`;
           cursorY += heightWithPad;
           maxBottom = Math.max(maxBottom, cursorY);
           cursorY += gutter;
         });
-        const totalHeight = padTop + Math.max(0, maxBottom + padBottom);
-        list.style.height = totalHeight + 'px';
+        list.style.height = padTop + Math.max(0, maxBottom + padBottom) + 'px';
         return;
       }
-
-      let cursorX = 0;
-      let cursorY = 0;
-      let rowHeight = 0;
-      let maxBottom = 0;
-      // Lay chips row by row in DOM order so entries stay chronological.
+      let cursorX = 0, cursorY = 0, rowHeight = 0, maxBottom = 0;
       wraps.forEach(wrap => {
         if(!(wrap instanceof HTMLElement)) return;
         const chip = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
-        // Measure the interactive button itself so spacing stays accurate while wraps animate.
         const itemWidth = chip ? chip.offsetWidth : wrap.offsetWidth;
         const itemHeight = chip ? chip.offsetHeight : wrap.offsetHeight;
         const padExtra = getSpotlightPad(wrap);
         const widthWithPad = itemWidth + padExtra;
         const heightWithPad = itemHeight + padExtra;
-        if(cursorX > 0 && cursorX + widthWithPad > availableWidth){
-          cursorX = 0;
-          cursorY += rowHeight + gutter;
-          rowHeight = 0;
-        }
-        const finalLeft = padLeft + cursorX;
-        const finalTop = padTop + cursorY;
-        wrap.style.transform = `translate3d(${finalLeft}px, ${finalTop}px, 0)`;
+        if(cursorX > 0 && cursorX + widthWithPad > availableWidth){ cursorX = 0; cursorY += rowHeight + gutter; rowHeight = 0; }
+        wrap.style.transform = `translate3d(${padLeft + cursorX}px, ${padTop + cursorY}px, 0)`;
         cursorX += widthWithPad + gutter;
         rowHeight = Math.max(rowHeight, heightWithPad);
         maxBottom = Math.max(maxBottom, cursorY + heightWithPad);
       });
-      const totalHeight = padTop + Math.max(0, maxBottom + padBottom);
-      list.style.height = totalHeight + 'px';
+      list.style.height = padTop + Math.max(0, maxBottom + padBottom) + 'px';
     }
 
     function scheduleLayout(){
       if(layoutScheduled) return;
       layoutScheduled = true;
-      raf(() => {
-        layoutScheduled = false;
-        layoutChipsNow();
-      });
+      raf(() => { layoutScheduled = false; layoutChipsNow(); });
     }
-
-    if(list){
-      window.addEventListener('resize', scheduleLayout);
-      list.addEventListener('dragover', handleListDragOver);
-      list.addEventListener('drop', handleListDrop);
-    }
-
-    const isTypingContext = (el) => {
-      if (!el) return false;
-      if (el.isContentEditable) return true;
-      const tag = el.tagName;
-      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-    };
-
+    if(list){ window.addEventListener('resize', scheduleLayout); list.addEventListener('dragover', handleListDragOver); list.addEventListener('drop', handleListDrop); }
+    const isTypingContext = (el) => { if (!el) return false; if (el.isContentEditable) return true; const tag = el.tagName; return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'; };
     function refreshChipMetrics(){
       if (!list) return;
-      const buttons = Array.from(list.querySelectorAll('.btn-item'));
-      buttons.forEach(btn => {
-        const stage = Number(btn.dataset.scaleStage || '0');
-        applyStageToChip(btn, stage, { remeasure: true });
-        if(chipResizeObserver) chipResizeObserver.observe(btn);
-      });
+      Array.from(list.querySelectorAll('.btn-item')).forEach(btn => { const stage = Number(btn.dataset.scaleStage || '0'); applyStageToChip(btn, stage, { remeasure: true }); if(chipResizeObserver) chipResizeObserver.observe(btn); });
       scheduleLayout();
     }
 
-    // ===== Font toolbar =====
     const fontPct = document.getElementById('fontPct');
     const chipScaleStep = 0.125;
     const chipScaleMin = sliderBounds.size.min;
@@ -544,26 +444,19 @@
     chipScale = Math.round(chipScale / sizeStep) * sizeStep;
     layoutConfig.chipScale = chipScale;
     if(chipSizeInput) chipSizeInput.value = chipScale.toFixed(3);
-
     const applyChipScale = () => {
       document.documentElement.style.setProperty('--chip-font-scale', chipScale.toString());
       layoutConfig.chipScale = chipScale;
-      if (chipSizeInput && document.activeElement !== chipSizeInput){
-        chipSizeInput.value = chipScale.toFixed(3);
-      }
+      if (chipSizeInput && document.activeElement !== chipSizeInput) chipSizeInput.value = chipScale.toFixed(3);
       if (fontPct) fontPct.textContent = Math.round(chipScale * 100) + '%';
       refreshChipMetrics();
     };
-
     const adjustChipScale = (delta) => {
       const nextRaw = Number((chipScale + delta).toFixed(4));
       const next = Math.min(chipScaleMax, Math.max(chipScaleMin, nextRaw));
       if (next === chipScale) return;
-      chipScale = next;
-      applyChipScale();
-      persistSettings();
+      chipScale = next; applyChipScale(); persistSettings();
     };
-
     const incFontBtn = document.getElementById('incFont');
     const decFontBtn = document.getElementById('decFont');
     const incFont2 = document.getElementById('incFont2');
@@ -579,160 +472,64 @@
       if(clamped === Math.round(layoutConfig.gutter) && Math.abs(clamped - layoutConfig.gutter) < 0.5) return false;
       layoutConfig.gutter = clamped;
       layoutConfig.step = Math.max(2, Math.min(8, Math.round(layoutConfig.gutter / 2))) || layoutConfig.step;
-      if(chipMarginInput){
-        chipMarginInput.value = String(clamped);
-      }
+      if(chipMarginInput) chipMarginInput.value = String(clamped);
       scheduleLayout();
       return true;
     };
-
     if (chipSizeInput){
       chipSizeInput.addEventListener('input', () => {
-        const raw = parseFloat(chipSizeInput.value);
-        if (!Number.isFinite(raw)) return;
+        const raw = parseFloat(chipSizeInput.value); if (!Number.isFinite(raw)) return;
         const clamped = clampNumber(raw, sliderBounds.size.min, sliderBounds.size.max);
         const snapped = Math.round(clamped / sizeStep) * sizeStep;
         if (!Number.isFinite(snapped) || Math.abs(snapped - chipScale) < 1e-4) return;
-        chipSizeInput.value = snapped.toFixed(3);
-        chipScale = snapped;
-        applyChipScale();
-        persistSettings();
+        chipSizeInput.value = snapped.toFixed(3); chipScale = snapped; applyChipScale(); persistSettings();
       });
     }
+    if (chipMarginInput){ chipMarginInput.addEventListener('input', () => { const value = parseFloat(chipMarginInput.value); if(!Number.isFinite(value)) return; if(updateGutter(value)) persistSettings(); }); }
 
-    if (chipMarginInput){
-      chipMarginInput.addEventListener('input', () => {
-        const value = parseFloat(chipMarginInput.value);
-        if(!Number.isFinite(value)) return;
-        if(updateGutter(value)) persistSettings();
-      });
-    }
-
-    // ===== Hotkeys =====
     document.addEventListener('keydown', (e) => {
       if (isTypingContext(e.target) || e.altKey || e.ctrlKey || e.metaKey) return;
       const key = e.key ? e.key.toLowerCase() : '';
-      if (key === 'q') {
-        e.preventDefault();
-        adjustChipScale(-chipScaleStep);
-      } else if (key === 'w') {
-        e.preventDefault();
-        adjustChipScale(chipScaleStep);
-      } else if (key === 'e') {
-        if (!input) return;
-        e.preventDefault();
-        input.focus();
-        if (typeof input.select === 'function') input.select();
-      }
+      if (key === 'q') { e.preventDefault(); adjustChipScale(-chipScaleStep); }
+      else if (key === 'w') { e.preventDefault(); adjustChipScale(chipScaleStep); }
+      else if (key === 'e') { if (!input) return; e.preventDefault(); input.focus(); if (typeof input.select === 'function') input.select(); }
     });
 
-    // ===== Color utilities =====
-    const BEAMER_COLORS = [
-      '#60A5FA',
-      '#22D3EE',
-      '#2DD4BF',
-      '#A3E635',
-      '#FACC15',
-      '#FB923C',
-      '#FB7185',
-      '#C084FC',
-      '#F472B6'
-    ];
+    const BEAMER_COLORS = ['#60A5FA','#22D3EE','#2DD4BF','#A3E635','#FACC15','#FB923C','#FB7185','#C084FC','#F472B6'];
     function randomColorHex(){ return BEAMER_COLORS[Math.floor(Math.random()*BEAMER_COLORS.length)]; }
     function hexToRgb(hex){ const n = parseInt(hex.slice(1),16); return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 }; }
     function srgbToLinear(u){ const c=u/255; return c<=0.03928? c/12.92 : Math.pow((c+0.055)/1.055,2.4); }
     function luminance(rgb){ const {r,g,b}=rgb; return 0.2126*srgbToLinear(r)+0.7152*srgbToLinear(g)+0.0722*srgbToLinear(b); }
     function shade(hex,percent){ const {r,g,b}=hexToRgb(hex); const f=v=>Math.min(255,Math.max(0,Math.round(v+(percent/100)*255))); const rr=f(r),gg=f(g),bb=f(b); return '#'+((1<<24)+(rr<<16)+(gg<<8)+bb).toString(16).slice(1).toUpperCase(); }
     function setChipColor(btn, hex){
-      btn.style.backgroundColor = hex;
-      btn.classList.add('chip-colored');
+      btn.style.backgroundColor = hex; btn.classList.add('chip-colored');
       const L = luminance(hexToRgb(hex));
       const contrastBlack = (L+0.05)/0.05; const contrastWhite = 1.05/(L+0.05); const useBlack = contrastBlack>=contrastWhite;
       btn.style.color = useBlack ? '#111827' : '#FFFFFF';
       btn.style.borderColor = useBlack ? shade(hex,-20) : shade(hex,20);
       btn.dataset.color = hex;
     }
-    function clearChipColor(btn){
-      btn.style.backgroundColor = '';
-      btn.style.color = '';
-      btn.style.borderColor = '';
-      btn.classList.remove('chip-colored');
-      delete btn.dataset.color;
-    }
+    function clearChipColor(btn){ btn.style.backgroundColor = ''; btn.style.color = ''; btn.style.borderColor = ''; btn.classList.remove('chip-colored'); delete btn.dataset.color; }
 
     const DEFAULT_SPOTLIGHT_HEX = '#0EA5E9';
-    const SPOTLIGHT_STYLE_PROPS = [
-      '--spotlight-border',
-      '--spotlight-shadow-main',
-      '--spotlight-shadow-ring',
-      '--spotlight-shadow-glow',
-      '--spotlight-grad-start',
-      '--spotlight-grad-end',
-      '--spotlight-halo',
-      '--spotlight-pulse-border'
-    ];
-
-    function normalizeHex(value){
-      if(typeof value !== 'string') return null;
-      const match = value.trim().match(/^#?([0-9a-f]{6})$/i);
-      return match ? '#' + match[1].toUpperCase() : null;
-    }
-
+    const SPOTLIGHT_STYLE_PROPS = ['--spotlight-border','--spotlight-shadow-main','--spotlight-shadow-ring','--spotlight-shadow-glow','--spotlight-grad-start','--spotlight-grad-end','--spotlight-halo','--spotlight-pulse-border'];
+    function normalizeHex(value){ if(typeof value !== 'string') return null; const match = value.trim().match(/^#?([0-9a-f]{6})$/i); return match ? '#' + match[1].toUpperCase() : null; }
     function rgbaFromHex(hex, alpha){
-      const { r, g, b } = hexToRgb(hex);
-      const numeric = Number(alpha);
-      const clamped = Number.isFinite(numeric) ? Math.min(1, Math.max(0, numeric)) : 1;
+      const { r, g, b } = hexToRgb(hex); const numeric = Number(alpha); const clamped = Number.isFinite(numeric) ? Math.min(1, Math.max(0, numeric)) : 1;
       const formattedAlpha = clamped.toFixed(3).replace(/\.?0+$/,'');
       return `rgba(${r}, ${g}, ${b}, ${formattedAlpha})`;
     }
-
-    function getSpotlightBaseColor(btn){
-      if(!btn) return DEFAULT_SPOTLIGHT_HEX;
-      const datasetHex = normalizeHex(btn.dataset.color || '');
-      if(datasetHex) return datasetHex;
-      const stored = normalizeHex(btn.dataset.spotlightColor || '');
-      if(stored) return stored;
-      return DEFAULT_SPOTLIGHT_HEX;
-    }
-
+    function getSpotlightBaseColor(btn){ if(!btn) return DEFAULT_SPOTLIGHT_HEX; const datasetHex = normalizeHex(btn.dataset.color || ''); if(datasetHex) return datasetHex; const stored = normalizeHex(btn.dataset.spotlightColor || ''); if(stored) return stored; return DEFAULT_SPOTLIGHT_HEX; }
     function applySpotlightTheme(btn, hex){
-      if(!btn) return;
-      const base = normalizeHex(hex) || DEFAULT_SPOTLIGHT_HEX;
-      btn.dataset.spotlightColor = base;
-      btn.style.setProperty('--spotlight-border', shade(base, -18));
-      btn.style.setProperty('--spotlight-shadow-main', rgbaFromHex(base, 0.42));
-      btn.style.setProperty('--spotlight-shadow-ring', rgbaFromHex(shade(base, -12), 0.58));
-      btn.style.setProperty('--spotlight-shadow-glow', rgbaFromHex(shade(base, 16), 0.62));
-      btn.style.setProperty('--spotlight-grad-start', rgbaFromHex(shade(base, 24), 0.24));
-      btn.style.setProperty('--spotlight-grad-end', rgbaFromHex(shade(base, -14), 0.14));
-      btn.style.setProperty('--spotlight-halo', rgbaFromHex(shade(base, 12), 0.55));
-      btn.style.setProperty('--spotlight-pulse-border', rgbaFromHex(shade(base, -8), 0.6));
+      if(!btn) return; const base = normalizeHex(hex) || DEFAULT_SPOTLIGHT_HEX; btn.dataset.spotlightColor = base;
+      btn.style.setProperty('--spotlight-border', shade(base, -18)); btn.style.setProperty('--spotlight-shadow-main', rgbaFromHex(base, 0.42)); btn.style.setProperty('--spotlight-shadow-ring', rgbaFromHex(shade(base, -12), 0.58)); btn.style.setProperty('--spotlight-shadow-glow', rgbaFromHex(shade(base, 16), 0.62)); btn.style.setProperty('--spotlight-grad-start', rgbaFromHex(shade(base, 24), 0.24)); btn.style.setProperty('--spotlight-grad-end', rgbaFromHex(shade(base, -14), 0.14)); btn.style.setProperty('--spotlight-halo', rgbaFromHex(shade(base, 12), 0.55)); btn.style.setProperty('--spotlight-pulse-border', rgbaFromHex(shade(base, -8), 0.6));
     }
+    function clearSpotlightTheme(btn){ if(!btn) return; SPOTLIGHT_STYLE_PROPS.forEach(prop => btn.style.removeProperty(prop)); delete btn.dataset.spotlightColor; }
 
-    function clearSpotlightTheme(btn){
-      if(!btn) return;
-      SPOTLIGHT_STYLE_PROPS.forEach(prop => btn.style.removeProperty(prop));
-      delete btn.dataset.spotlightColor;
-    }
-
-    // ===== Emoji utilities =====
     function startsWithEmoji(str){ const s=(str||'').trim(); if(!s) return false; const cp=s.codePointAt(0); return (cp>=0x1F300&&cp<=0x1FAFF)||(cp>=0x2600&&cp<=0x27BF); }
-    function removeLeadingEmoji(str){
-      const s=(str||'').trimStart();
-      if(!s || !startsWithEmoji(s)) return str||'';
-      const cp=s.codePointAt(0);
-      const firstLength=cp>0xFFFF ? 2 : 1;
-      return s.slice(firstLength).replace(/^\uFE0F?\s*/, '');
-    }
+    function removeLeadingEmoji(str){ const s=(str||'').trimStart(); if(!s || !startsWithEmoji(s)) return str||''; const cp=s.codePointAt(0); const firstLength=cp>0xFFFF ? 2 : 1; return s.slice(firstLength).replace(/^\uFE0F?\s*/, ''); }
     function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
-    function hasAny(label,words){
-      const l=norm(label);
-      return words.some(w=> {
-        if(!w) return false;
-        return l.includes(norm(w));
-      });
-    }
-
+    function hasAny(label,words){ const l=norm(label); return words.some(w=> { if(!w) return false; return l.includes(norm(w)); }); }
     const emojiRules = [
       { words:['?'], e:'❓' }, { words:['!'], e:'❗' },
       { words:['webseite','website','homepage','web'], e:'🌐' },
@@ -767,688 +564,160 @@
       { words:['schule','schule/bildung','bildung','studieren','lernen','lesson','chapter'], e:'📚' }, { words:['musik-empfehlung','musik','music','song','lied'], e:'🎵' }, { words:['übersetzungs-app','uebersetzungs-app','translate','translator','translation'], e:'🌐' },
       { words:['pizza'], e:'🍕' }, { words:['farbe','color','paint','malen'], e:'🎨' }, { words:['haus','home','zuhause','wohnung'], e:'🏠' }, { words:['tanzen','dance'], e:'💃' }
     ];
-
     function detectEmoji(label){ if(label.includes('?')) return '❓'; if(label.includes('!')) return '❗'; for(const r of emojiRules) if(hasAny(label,r.words)) return r.e; return ''; }
     function maybeAddEmoji(label){ if(!emojiToggle||!emojiToggle.checked) return label; if(startsWithEmoji(label)) return label; const em=detectEmoji(label); return em? (em+' '+label):label; }
 
-    // ===== Chip helpers =====
-    function clearChipInlineSizing(btn){
-      if(!(btn instanceof HTMLElement)) return;
-      const { style } = btn;
-      style.fontSize = '';
-      style.paddingLeft = '';
-      style.paddingRight = '';
-      style.paddingTop = '';
-      style.paddingBottom = '';
-    }
-
-    function forceChipStyleSync(btn){
-      if(!(btn instanceof HTMLElement)) return;
-      // Access layout to flush pending style updates before measuring.
-      void btn.offsetWidth;
-    }
-
+    function clearChipInlineSizing(btn){ if(!(btn instanceof HTMLElement)) return; const { style } = btn; style.fontSize = ''; style.paddingLeft = ''; style.paddingRight = ''; style.paddingTop = ''; style.paddingBottom = ''; }
+    function forceChipStyleSync(btn){ if(!(btn instanceof HTMLElement)) return; void btn.offsetWidth; }
     function suspendChipTransitions(btn){
       if(!(btn instanceof HTMLElement)) return () => {};
-      const { style } = btn;
-      const prev = style.transition;
-      style.transition = 'none';
-      // Flush so the no-transition state takes effect immediately.
-      void btn.offsetWidth;
-      return () => {
-        style.transition = prev;
-        // Flush again so re-enabled transitions apply to subsequent changes.
-        void btn.offsetWidth;
-      };
+      const { style } = btn; const prev = style.transition; style.transition = 'none'; void btn.offsetWidth;
+      return () => { style.transition = prev; void btn.offsetWidth; };
     }
-
     function updateBaseMetrics(btn){
-      const stage = Number(btn.dataset.scaleStage || '0');
-      const factor = 1 + (SPOTLIGHT_STEPS[stage] || 0);
-      const cs = getComputedStyle(btn);
-      const normalize = (value) => {
-        const num = parseFloat(value);
-        if(!Number.isFinite(num)) return 0;
-        return num / (factor || 1);
-      };
-      btn.dataset.baseFont = String(normalize(cs.fontSize));
-      btn.dataset.basePadLeft = String(normalize(cs.paddingLeft));
-      btn.dataset.basePadRight = String(normalize(cs.paddingRight));
-      btn.dataset.basePadTop = String(normalize(cs.paddingTop));
-      btn.dataset.basePadBottom = String(normalize(cs.paddingBottom));
-      btn.dataset.metrics='1';
+      const stage = Number(btn.dataset.scaleStage || '0'); const factor = 1 + (SPOTLIGHT_STEPS[stage] || 0); const cs = getComputedStyle(btn);
+      const normalize = (value) => { const num = parseFloat(value); if(!Number.isFinite(num)) return 0; return num / (factor || 1); };
+      btn.dataset.baseFont = String(normalize(cs.fontSize)); btn.dataset.basePadLeft = String(normalize(cs.paddingLeft)); btn.dataset.basePadRight = String(normalize(cs.paddingRight)); btn.dataset.basePadTop = String(normalize(cs.paddingTop)); btn.dataset.basePadBottom = String(normalize(cs.paddingBottom)); btn.dataset.metrics='1';
     }
-
     function applyStageToChip(btn, stage, { remeasure = false } = {}){
-      let next = Number(stage);
-      if(!Number.isFinite(next) || next < 0 || next >= SPOTLIGHT_STEPS.length) next = 0;
-      if(remeasure){
-        const restoreTransitions = suspendChipTransitions(btn);
-        clearChipInlineSizing(btn);
-        forceChipStyleSync(btn);
-        btn.dataset.scaleStage = '0';
-        btn.dataset.metrics = '0';
-        updateBaseMetrics(btn);
-        restoreTransitions();
-      }else if(btn.dataset.metrics!=='1'){
-        updateBaseMetrics(btn);
-      }
+      let next = Number(stage); if(!Number.isFinite(next) || next < 0 || next >= SPOTLIGHT_STEPS.length) next = 0;
+      if(remeasure){ const restoreTransitions = suspendChipTransitions(btn); clearChipInlineSizing(btn); forceChipStyleSync(btn); btn.dataset.scaleStage = '0'; btn.dataset.metrics = '0'; updateBaseMetrics(btn); restoreTransitions(); }
+      else if(btn.dataset.metrics!=='1') updateBaseMetrics(btn);
       btn.dataset.scaleStage = String(next);
       const factor = 1 + SPOTLIGHT_STEPS[next];
-      const baseFont = Number(btn.dataset.baseFont);
-      const basePadLeft = Number(btn.dataset.basePadLeft);
-      const basePadRight = Number(btn.dataset.basePadRight);
-      const basePadTop = Number(btn.dataset.basePadTop);
-      const basePadBottom = Number(btn.dataset.basePadBottom);
+      const baseFont = Number(btn.dataset.baseFont), basePadLeft = Number(btn.dataset.basePadLeft), basePadRight = Number(btn.dataset.basePadRight), basePadTop = Number(btn.dataset.basePadTop), basePadBottom = Number(btn.dataset.basePadBottom);
       const style = btn.style;
-      if(Math.abs(factor - 1) < 0.0001){
-        clearChipInlineSizing(btn);
-        return;
-      }
-      const format = (base) => {
-        if(!Number.isFinite(base)) return '';
-        const value = base * factor;
-        if(Math.abs(value) < 1e-4) return '0px';
-        const fixed = value.toFixed(3);
-        const trimmed = fixed.replace(/\.?0+$/,'');
-        return (trimmed === '' ? '0' : trimmed) + 'px';
-      };
-      style.fontSize = format(baseFont);
-      style.paddingLeft = format(basePadLeft);
-      style.paddingRight = format(basePadRight);
-      style.paddingTop = format(basePadTop);
-      style.paddingBottom = format(basePadBottom);
+      if(Math.abs(factor - 1) < 0.0001){ clearChipInlineSizing(btn); return; }
+      const format = (base) => { if(!Number.isFinite(base)) return ''; const value = base * factor; if(Math.abs(value) < 1e-4) return '0px'; const fixed = value.toFixed(3); const trimmed = fixed.replace(/\.?0+$/,''); return (trimmed === '' ? '0' : trimmed) + 'px'; };
+      style.fontSize = format(baseFont); style.paddingLeft = format(basePadLeft); style.paddingRight = format(basePadRight); style.paddingTop = format(basePadTop); style.paddingBottom = format(basePadBottom);
     }
-
-    function cycleChipStage(btn){
-      const current = Number(btn.dataset.scaleStage || '0');
-      const next = (current + 1) % SPOTLIGHT_STEPS.length;
-      updateBaseMetrics(btn);
-      applyStageToChip(btn, next);
-      scheduleLayout();
-      saveChips();
-    }
-
-    function setWrapSpotlightState(wrap, pad){
-      if(!wrap) return;
-      const next = Number.isFinite(pad) ? Math.max(0, pad) : 0;
-      if(next > 0){
-        wrap.dataset.spotlightPad = String(next);
-        wrap.style.padding = (next / 2) + 'px';
-      }else{
-        delete wrap.dataset.spotlightPad;
-        wrap.style.padding = '0px';
-      }
-    }
-
+    function cycleChipStage(btn){ const current = Number(btn.dataset.scaleStage || '0'); const next = (current + 1) % SPOTLIGHT_STEPS.length; updateBaseMetrics(btn); applyStageToChip(btn, next); scheduleLayout(); saveChips(); }
+    function setWrapSpotlightState(wrap, pad){ if(!wrap) return; const next = Number.isFinite(pad) ? Math.max(0, pad) : 0; if(next > 0){ wrap.dataset.spotlightPad = String(next); wrap.style.padding = (next / 2) + 'px'; }else{ delete wrap.dataset.spotlightPad; wrap.style.padding = '0px'; } }
     function toggleChipSpotlight(btn){
-      if(!btn) return;
-      const host = btn.closest('.btn-wrap');
-      const activate = !btn.classList.contains(CHIP_SPOTLIGHT_CLASS);
-      if(list){
-        list.querySelectorAll('.btn-item.' + CHIP_SPOTLIGHT_CLASS).forEach(other=>{
-          if(other === btn) return;
-          other.classList.remove(CHIP_SPOTLIGHT_CLASS);
-          clearSpotlightTheme(other);
-          const otherHost = other.closest('.btn-wrap');
-          setWrapSpotlightState(otherHost, 0);
-        });
-      }
-      if(activate){
-        btn.classList.add(CHIP_SPOTLIGHT_CLASS);
-        applySpotlightTheme(btn, getSpotlightBaseColor(btn));
-        setWrapSpotlightState(host, CHIP_SPOTLIGHT_PAD);
-      }else{
-        btn.classList.remove(CHIP_SPOTLIGHT_CLASS);
-        clearSpotlightTheme(btn);
-        setWrapSpotlightState(host, 0);
-      }
+      if(!btn) return; const host = btn.closest('.btn-wrap'); const activate = !btn.classList.contains(CHIP_SPOTLIGHT_CLASS);
+      if(list) list.querySelectorAll('.btn-item.' + CHIP_SPOTLIGHT_CLASS).forEach(other=>{ if(other === btn) return; other.classList.remove(CHIP_SPOTLIGHT_CLASS); clearSpotlightTheme(other); setWrapSpotlightState(other.closest('.btn-wrap'), 0); });
+      if(activate){ btn.classList.add(CHIP_SPOTLIGHT_CLASS); applySpotlightTheme(btn, getSpotlightBaseColor(btn)); setWrapSpotlightState(host, CHIP_SPOTLIGHT_PAD); }
+      else{ btn.classList.remove(CHIP_SPOTLIGHT_CLASS); clearSpotlightTheme(btn); setWrapSpotlightState(host, 0); }
       scheduleLayout();
     }
 
-    function registerChipDragHandlers(btn){
-      if(!btn || btn.dataset.dragBound === '1') return;
-      btn.addEventListener('dragstart', handleChipDragStart);
-      btn.addEventListener('dragend', handleChipDragEnd);
-      btn.addEventListener('dragenter', handleChipDragEnter);
-      btn.addEventListener('dragleave', handleChipDragLeave);
-      btn.addEventListener('dragover', handleChipDragOver);
-      btn.addEventListener('drop', handleChipDrop);
-      btn.dataset.dragBound = '1';
-    }
-
-    function syncChipDragCapability(btn){
-      if(!btn) return;
-      if(layoutConfig.mode === 'stack'){
-        btn.setAttribute('draggable', 'true');
-      }else{
-        btn.removeAttribute('draggable');
-        btn.classList.remove('chip-dragging');
-      }
-    }
-
-    function syncStackDragState(){
-      if(!list) return;
-      const enable = layoutConfig.mode === 'stack';
-      const wraps = Array.from(list.querySelectorAll('.btn-wrap'));
-      wraps.forEach(wrap => {
-        if(!(wrap instanceof HTMLElement)) return;
-        wrap.classList.remove('dragging', 'drop-target');
-        const btn = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
-        if(!btn) return;
-        if(enable){
-          btn.setAttribute('draggable', 'true');
-        }else{
-          btn.removeAttribute('draggable');
-          btn.classList.remove('chip-dragging');
-        }
-      });
-    }
-
-    function resequenceWrapOrder(){
-      if(!list) return;
-      const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement);
-      wraps.forEach((wrap, index) => {
-        wrap.dataset.createdAt = String(index);
-      });
-      chipSequence = wraps.length;
-    }
-
-    function clearDragHighlights(){
-      if(!list) return;
-      list.querySelectorAll('.btn-wrap.drop-target').forEach(node => {
-        if(node instanceof HTMLElement) node.classList.remove('drop-target');
-      });
-    }
-
-    function finalizeDrag(){
-      if(!list) return;
-      if(dragState.wrap instanceof HTMLElement){
-        dragState.wrap.classList.remove('dragging');
-      }
-      if(dragState.btn instanceof HTMLElement){
-        dragState.btn.classList.remove('chip-dragging');
-      }
-      clearDragHighlights();
-      if(dragState.pendingCommit){
-        resequenceWrapOrder();
-        saveChips();
-      }
-      dragState.btn = null;
-      dragState.wrap = null;
-      dragState.pendingCommit = false;
-      scheduleLayout();
-    }
-
+    function registerChipDragHandlers(btn){ if(!btn || btn.dataset.dragBound === '1') return; btn.addEventListener('dragstart', handleChipDragStart); btn.addEventListener('dragend', handleChipDragEnd); btn.addEventListener('dragenter', handleChipDragEnter); btn.addEventListener('dragleave', handleChipDragLeave); btn.addEventListener('dragover', handleChipDragOver); btn.addEventListener('drop', handleChipDrop); btn.dataset.dragBound = '1'; }
+    function syncChipDragCapability(btn){ if(!btn) return; if(layoutConfig.mode === 'stack') btn.setAttribute('draggable', 'true'); else{ btn.removeAttribute('draggable'); btn.classList.remove('chip-dragging'); } }
+    function syncStackDragState(){ if(!list) return; const enable = layoutConfig.mode === 'stack'; Array.from(list.querySelectorAll('.btn-wrap')).forEach(wrap => { if(!(wrap instanceof HTMLElement)) return; wrap.classList.remove('dragging', 'drop-target'); const btn = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null; if(!btn) return; if(enable) btn.setAttribute('draggable', 'true'); else{ btn.removeAttribute('draggable'); btn.classList.remove('chip-dragging'); } }); }
+    function resequenceWrapOrder(){ if(!list) return; const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement); wraps.forEach((wrap,index)=>{ wrap.dataset.createdAt = String(index); }); chipSequence = wraps.length; }
+    function clearDragHighlights(){ if(!list) return; list.querySelectorAll('.btn-wrap.drop-target').forEach(node => { if(node instanceof HTMLElement) node.classList.remove('drop-target'); }); }
+    function finalizeDrag(){ if(!list) return; if(dragState.wrap instanceof HTMLElement) dragState.wrap.classList.remove('dragging'); if(dragState.btn instanceof HTMLElement) dragState.btn.classList.remove('chip-dragging'); clearDragHighlights(); if(dragState.pendingCommit){ resequenceWrapOrder(); saveChips(); } dragState.btn = null; dragState.wrap = null; dragState.pendingCommit = false; scheduleLayout(); }
     function handleChipDragStart(event){
-      if(layoutConfig.mode !== 'stack'){
-        event.preventDefault();
-        return;
-      }
-      const btn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
-      if(!btn) return;
-      const wrap = btn.closest('.btn-wrap');
-      if(!(wrap instanceof HTMLElement)){
-        event.preventDefault();
-        return;
-      }
-      dragState.btn = btn;
-      dragState.wrap = wrap;
-      dragState.pendingCommit = false;
-      wrap.classList.add('dragging');
-      btn.classList.add('chip-dragging');
-      if(event.dataTransfer){
-        event.dataTransfer.effectAllowed = 'move';
-        try{ event.dataTransfer.setData('text/plain', btn.dataset.label || ''); }
-        catch(_){}
-      }
+      if(layoutConfig.mode !== 'stack'){ event.preventDefault(); return; }
+      const btn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null; if(!btn) return; const wrap = btn.closest('.btn-wrap'); if(!(wrap instanceof HTMLElement)){ event.preventDefault(); return; }
+      dragState.btn = btn; dragState.wrap = wrap; dragState.pendingCommit = false; wrap.classList.add('dragging'); btn.classList.add('chip-dragging');
+      if(event.dataTransfer){ event.dataTransfer.effectAllowed = 'move'; try{ event.dataTransfer.setData('text/plain', btn.dataset.label || ''); }catch(_){} }
     }
-
-    function handleChipDragEnd(){
-      finalizeDrag();
-    }
-
-    function handleChipDragEnter(event){
-      if(layoutConfig.mode !== 'stack') return;
-      const targetBtn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
-      if(!targetBtn) return;
-      const targetWrap = targetBtn.closest('.btn-wrap');
-      if(!(targetWrap instanceof HTMLElement)) return;
-      if(dragState.wrap && targetWrap !== dragState.wrap){
-        targetWrap.classList.add('drop-target');
-      }
-    }
-
-    function handleChipDragLeave(event){
-      const targetBtn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
-      if(!targetBtn) return;
-      const targetWrap = targetBtn.closest('.btn-wrap');
-      if(!(targetWrap instanceof HTMLElement)) return;
-      if(targetWrap !== dragState.wrap){
-        targetWrap.classList.remove('drop-target');
-      }
-    }
-
-    function handleChipDragOver(event){
-      if(layoutConfig.mode !== 'stack') return;
-      if(!dragState.wrap) return;
-      event.preventDefault();
-      if(event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-    }
-
+    function handleChipDragEnd(){ finalizeDrag(); }
+    function handleChipDragEnter(event){ if(layoutConfig.mode !== 'stack') return; const targetBtn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null; if(!targetBtn) return; const targetWrap = targetBtn.closest('.btn-wrap'); if(!(targetWrap instanceof HTMLElement)) return; if(dragState.wrap && targetWrap !== dragState.wrap) targetWrap.classList.add('drop-target'); }
+    function handleChipDragLeave(event){ const targetBtn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null; if(!targetBtn) return; const targetWrap = targetBtn.closest('.btn-wrap'); if(!(targetWrap instanceof HTMLElement)) return; if(targetWrap !== dragState.wrap) targetWrap.classList.remove('drop-target'); }
+    function handleChipDragOver(event){ if(layoutConfig.mode !== 'stack' || !dragState.wrap) return; event.preventDefault(); if(event.dataTransfer) event.dataTransfer.dropEffect = 'move'; }
     function handleChipDrop(event){
-      if(layoutConfig.mode !== 'stack') return;
-      if(!dragState.wrap) return;
-      const sourceWrap = dragState.wrap;
-      const targetBtn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
-      if(!targetBtn) return;
-      const targetWrap = targetBtn.closest('.btn-wrap');
-      if(!(targetWrap instanceof HTMLElement)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      targetWrap.classList.remove('drop-target');
-      if(targetWrap === sourceWrap) return;
-      const rect = targetWrap.getBoundingClientRect();
-      const shouldInsertAfter = event.clientY > rect.top + rect.height / 2;
-      const referenceNode = shouldInsertAfter ? targetWrap.nextSibling : targetWrap;
-      if(referenceNode !== sourceWrap){
-        list.insertBefore(sourceWrap, referenceNode);
-        dragState.pendingCommit = true;
-      }
+      if(layoutConfig.mode !== 'stack' || !dragState.wrap) return; const sourceWrap = dragState.wrap; const targetBtn = event.currentTarget instanceof HTMLElement ? event.currentTarget : null; if(!targetBtn) return; const targetWrap = targetBtn.closest('.btn-wrap'); if(!(targetWrap instanceof HTMLElement)) return;
+      event.preventDefault(); event.stopPropagation(); targetWrap.classList.remove('drop-target'); if(targetWrap === sourceWrap) return;
+      const rect = targetWrap.getBoundingClientRect(); const shouldInsertAfter = event.clientY > rect.top + rect.height / 2; const referenceNode = shouldInsertAfter ? targetWrap.nextSibling : targetWrap;
+      if(referenceNode !== sourceWrap){ list.insertBefore(sourceWrap, referenceNode); dragState.pendingCommit = true; }
     }
-
-    function handleListDragOver(event){
-      if(layoutConfig.mode !== 'stack') return;
-      if(!dragState.wrap) return;
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      if(target && target.closest('.btn-item')) return;
-      event.preventDefault();
-      if(event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-    }
-
-    function handleListDrop(event){
-      if(layoutConfig.mode !== 'stack') return;
-      if(!dragState.wrap) return;
-      event.preventDefault();
-      dragState.pendingCommit = true;
-      list.appendChild(dragState.wrap);
-      finalizeDrag();
-    }
-
-    const getSpotlightPad = (wrap) => {
-      if(!(wrap instanceof HTMLElement)) return 0;
-      const value = Number(wrap.dataset.spotlightPad || '0');
-      return Number.isFinite(value) ? Math.max(0, value) : 0;
-    };
+    function handleListDragOver(event){ if(layoutConfig.mode !== 'stack' || !dragState.wrap) return; const target = event.target instanceof HTMLElement ? event.target : null; if(target && target.closest('.btn-item')) return; event.preventDefault(); if(event.dataTransfer) event.dataTransfer.dropEffect = 'move'; }
+    function handleListDrop(event){ if(layoutConfig.mode !== 'stack' || !dragState.wrap) return; event.preventDefault(); dragState.pendingCommit = true; list.appendChild(dragState.wrap); finalizeDrag(); }
+    const getSpotlightPad = (wrap) => { if(!(wrap instanceof HTMLElement)) return 0; const value = Number(wrap.dataset.spotlightPad || '0'); return Number.isFinite(value) ? Math.max(0, value) : 0; };
 
     function createChip(label, options = {}){
-      const wrap=document.createElement('div');
-      wrap.className='btn-wrap';
-      wrap.style.transform='translate3d(0,0,0)';
-      wrap.style.padding='0px';
-      const providedOrder = options.createdAt;
-      const numericOrder = Number(providedOrder);
-      if(Number.isFinite(numericOrder)){
-        wrap.dataset.createdAt = String(numericOrder);
-        chipSequence = Math.max(chipSequence, numericOrder + 1);
-      }else{
-        wrap.dataset.createdAt = String(chipSequence++);
-      }
-      const btn=document.createElement('button'); btn.type='button'; btn.className='btn-item chip';
-      btn.dataset.label = label;
-      btn.dataset.scaleStage = '0';
-      btn.dataset.metrics = '0';
-      btn.textContent = maybeAddEmoji(label);
+      const wrap=document.createElement('div'); wrap.className='btn-wrap'; wrap.style.transform='translate3d(0,0,0)'; wrap.style.padding='0px';
+      const numericOrder = Number(options.createdAt);
+      if(Number.isFinite(numericOrder)){ wrap.dataset.createdAt = String(numericOrder); chipSequence = Math.max(chipSequence, numericOrder + 1); } else wrap.dataset.createdAt = String(chipSequence++);
+      const btn=document.createElement('button'); btn.type='button'; btn.className='btn-item chip'; btn.dataset.label = label; btn.dataset.scaleStage = '0'; btn.dataset.metrics = '0'; btn.textContent = maybeAddEmoji(label);
       if(typeof options.displayText === 'string') btn.textContent = options.displayText;
-      registerChipDragHandlers(btn);
-      syncChipDragCapability(btn);
-      if(chipResizeObserver) chipResizeObserver.observe(btn);
+      registerChipDragHandlers(btn); syncChipDragCapability(btn); if(chipResizeObserver) chipResizeObserver.observe(btn);
       btn.title='Click to cycle size (+30%, +60%, +90%, +120%, +150%). Shift+Click resets. Press Delete to remove';
-      if(options.color){
-        setChipColor(btn, options.color);
-      }else if(!options.skipRandom && randToggle && randToggle.checked){
-        setChipColor(btn, randomColorHex());
-      }else{
-        clearChipColor(btn);
-      }
+      if(options.color) setChipColor(btn, options.color); else if(!options.skipRandom && randToggle && randToggle.checked) setChipColor(btn, randomColorHex()); else clearChipColor(btn);
       btn.addEventListener('click',(event)=>{
-        if(event.ctrlKey || event.metaKey){
-          event.preventDefault();
-          toggleChipSpotlight(btn);
-          btn.focus();
-          return;
-        }
-        if(event.shiftKey){
-          event.preventDefault();
-          const currentStage = Number(btn.dataset.scaleStage || '0');
-          if(currentStage !== 0){
-            updateBaseMetrics(btn);
-            applyStageToChip(btn, 0);
-            scheduleLayout();
-            saveChips();
-          }
-        }else{
-          cycleChipStage(btn);
-        }
+        if(event.ctrlKey || event.metaKey){ event.preventDefault(); toggleChipSpotlight(btn); btn.focus(); return; }
+        if(event.shiftKey){ event.preventDefault(); const currentStage = Number(btn.dataset.scaleStage || '0'); if(currentStage !== 0){ updateBaseMetrics(btn); applyStageToChip(btn, 0); scheduleLayout(); saveChips(); } }
+        else cycleChipStage(btn);
         btn.focus();
       });
       btn.addEventListener('keydown',(e)=>{
-        if(e.key==='Enter'||e.key===' '){
-          e.preventDefault();
-          cycleChipStage(btn);
-        } else if(e.key==='Delete'){
-          e.preventDefault();
-          const host=btn.closest('.btn-wrap');
-          if(host){
-            if(chipResizeObserver) chipResizeObserver.unobserve(btn);
-            host.remove();
-            scheduleLayout();
-            saveChips();
-          }
-        }
+        if(e.key==='Enter'||e.key===' '){ e.preventDefault(); cycleChipStage(btn); }
+        else if(e.key==='Delete'){ e.preventDefault(); const host=btn.closest('.btn-wrap'); if(host){ if(chipResizeObserver) chipResizeObserver.unobserve(btn); host.remove(); scheduleLayout(); saveChips(); } }
       });
-      wrap.appendChild(btn);
-      return wrap;
+      wrap.appendChild(btn); return wrap;
     }
 
-    function sortWrapsBy(compare){
-      if(!list) return [];
-      const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement);
-      wraps.sort(compare).forEach(node => list.appendChild(node));
-      return wraps;
-    }
-
-    function restoreCreationOrder(){
-      sortWrapsBy((a, b) => {
-        const aOrder = Number(a.dataset.createdAt || '0');
-        const bOrder = Number(b.dataset.createdAt || '0');
-        if(!Number.isFinite(aOrder) && !Number.isFinite(bOrder)) return 0;
-        if(!Number.isFinite(aOrder)) return 1;
-        if(!Number.isFinite(bOrder)) return -1;
-        return aOrder - bOrder;
-      });
-    }
-
-    function updateLayoutModeUI(){
-      const mode = layoutConfig.mode;
-      const isMasonry = mode === 'masonry';
-      const isStack = mode === 'stack';
-      if(masonryToggleBtn){
-        masonryToggleBtn.classList.toggle('btn-primary', isMasonry);
-        masonryToggleBtn.setAttribute('aria-pressed', String(isMasonry));
-      }
-      if(oneLineToggleBtn){
-        oneLineToggleBtn.classList.toggle('btn-primary', isStack);
-        oneLineToggleBtn.setAttribute('aria-pressed', String(isStack));
-      }
-    }
-
+    function sortWrapsBy(compare){ if(!list) return []; const wraps = Array.from(list.children).filter(node => node instanceof HTMLElement); wraps.sort(compare).forEach(node => list.appendChild(node)); return wraps; }
+    function restoreCreationOrder(){ sortWrapsBy((a,b)=>{ const aOrder = Number(a.dataset.createdAt || '0'); const bOrder = Number(b.dataset.createdAt || '0'); if(!Number.isFinite(aOrder) && !Number.isFinite(bOrder)) return 0; if(!Number.isFinite(aOrder)) return 1; if(!Number.isFinite(bOrder)) return -1; return aOrder - bOrder; }); }
+    function updateLayoutModeUI(){ const mode = layoutConfig.mode; const isMasonry = mode === 'masonry'; const isStack = mode === 'stack'; if(masonryToggleBtn){ masonryToggleBtn.classList.toggle('btn-primary', isMasonry); masonryToggleBtn.setAttribute('aria-pressed', String(isMasonry)); } if(oneLineToggleBtn){ oneLineToggleBtn.classList.toggle('btn-primary', isStack); oneLineToggleBtn.setAttribute('aria-pressed', String(isStack)); } }
     function setLayoutMode(mode, { force = false, reorder = true } = {}){
-      const next = mode === 'masonry' ? 'masonry' : mode === 'stack' ? 'stack' : 'flow';
-      const changed = layoutConfig.mode !== next;
-      if(next !== 'stack' && dragState.wrap){
-        finalizeDrag();
-      }
-      layoutConfig.mode = next;
-      if(reorder && (next === 'flow' || next === 'stack')){
-        restoreCreationOrder();
-      }
-      updateLayoutModeUI();
-      syncStackDragState();
-      if(changed || force){
-        scheduleLayout();
-      }
+      const next = mode === 'masonry' ? 'masonry' : mode === 'stack' ? 'stack' : 'flow'; const changed = layoutConfig.mode !== next;
+      if(next !== 'stack' && dragState.wrap) finalizeDrag(); layoutConfig.mode = next;
+      if(reorder && (next === 'flow' || next === 'stack')) restoreCreationOrder(); updateLayoutModeUI(); syncStackDragState(); if(changed || force) scheduleLayout();
     }
-
     function getChipData(){
-      if(!list) return [];
-      const payload = [];
-      list.querySelectorAll('.btn-item').forEach(btn=>{
-        const raw = (btn.dataset.label || '').trim();
-        if(!raw) return;
-        const host = btn.closest('.btn-wrap');
-        const orderValue = host ? Number(host.dataset.createdAt || '') : NaN;
-        payload.push({
-          label: raw,
-          color: btn.dataset.color || null,
-          scaleStage: Number(btn.dataset.scaleStage || '0'),
-          display: btn.textContent || '',
-          order: Number.isFinite(orderValue) ? orderValue : null
-        });
-      });
+      if(!list) return []; const payload = [];
+      list.querySelectorAll('.btn-item').forEach(btn=>{ const raw = (btn.dataset.label || '').trim(); if(!raw) return; const host = btn.closest('.btn-wrap'); const orderValue = host ? Number(host.dataset.createdAt || '') : NaN; payload.push({ label: raw, color: btn.dataset.color || null, scaleStage: Number(btn.dataset.scaleStage || '0'), display: btn.textContent || '', order: Number.isFinite(orderValue) ? orderValue : null }); });
       return payload;
     }
-
-    function saveChips(){
-      if(!list) return;
-      const activeSave = getActiveSave();
-      if(!activeSave) return;
-      activeSave.chips = getChipData();
-      persistSaveState();
-    }
-
+    function saveChips(){ if(!list) return; const activeSave = getActiveSave(); if(!activeSave) return; activeSave.chips = getChipData(); persistSaveState(); }
     function appendChipFromData(item){
-      if(!list || !item || typeof item.label!=='string') return;
-      const text = item.label.trim();
-      if(!text) return;
-      const display = typeof item.display==='string' ? item.display : undefined;
-      const orderNumeric = Number(item.order);
-      const node=createChip(text, {
-        color: item.color || undefined,
-        skipRandom: true,
-        displayText: display,
-        createdAt: Number.isFinite(orderNumeric) ? orderNumeric : undefined
-      });
-      list.appendChild(node);
-      const btn=node.querySelector('.btn-item');
-      if(btn){
-        const stage = Number(item.scaleStage || 0);
-        applyStageToChip(btn, stage, { remeasure: true });
-      }
+      if(!list || !item || typeof item.label!=='string') return; const text = item.label.trim(); if(!text) return;
+      const display = typeof item.display==='string' ? item.display : undefined; const orderNumeric = Number(item.order);
+      const node=createChip(text, { color: item.color || undefined, skipRandom: true, displayText: display, createdAt: Number.isFinite(orderNumeric) ? orderNumeric : undefined }); list.appendChild(node);
+      const btn=node.querySelector('.btn-item'); if(btn){ const stage = Number(item.scaleStage || 0); applyStageToChip(btn, stage, { remeasure: true }); }
     }
+    function replaceChips(data, { persist = true, focus = true } = {}){ if(!list) return; list.innerHTML = ''; chipSequence = 0; if(Array.isArray(data)) data.forEach(appendChipFromData); restoreCreationOrder(); setLayoutMode('flow', { force: true, reorder: false }); refreshChipMetrics(); if(persist) saveChips(); if(focus && input) input.focus(); scheduleLayout(); }
+    function loadChips(){ renderSaveSelector(); const activeSave = getActiveSave(); replaceChips(activeSave ? activeSave.chips : [], { persist: false, focus: false }); }
+    function activateSave(id){ if(typeof id !== 'string' || id === saveState.activeId) return; if(!saveState.saves.some(save => save.id === id)) return; saveChips(); saveState.activeId = id; persistSaveState(); renderSaveSelector(); const activeSave = getActiveSave(); replaceChips(activeSave ? activeSave.chips : [], { persist: false }); }
+    function createNewSave(){ saveChips(); const newSave = { id: makeSaveId(), name: nextSaveName(saveState.saves), chips: [] }; saveState.saves.push(newSave); saveState.activeId = newSave.id; persistSaveState(); renderSaveSelector(); replaceChips([], { persist: false }); }
+    function addFromInput(){ const value=input.value.trim(); if(!value) return; const node=createChip(value); list.appendChild(node); scheduleLayout(); saveChips(); input.value=''; input.focus(); }
+    function clearAllChips(){ if(!list) return; list.innerHTML=''; chipSequence = 0; scheduleLayout(); saveChips(); if(input) input.focus(); }
 
-    function replaceChips(data, { persist = true, focus = true } = {}){
-      if(!list) return;
-      list.innerHTML = '';
-      chipSequence = 0;
-      if(Array.isArray(data)) data.forEach(appendChipFromData);
-      restoreCreationOrder();
-      setLayoutMode('flow', { force: true, reorder: false });
-      refreshChipMetrics();
-      if(persist) saveChips();
-      if(focus && input) input.focus();
-      scheduleLayout();
-    }
+    loadChips(); scheduleLayout(); settingsReady = true; persistSettings(); updateLayoutModeUI();
+    if(saveSelect) saveSelect.addEventListener('change', ()=>activateSave(saveSelect.value));
+    if(newSaveBtn) newSaveBtn.addEventListener('click', createNewSave);
+    if(masonryToggleBtn) masonryToggleBtn.addEventListener('click', ()=>{ const nextMode = layoutConfig.mode === 'masonry' ? 'flow' : 'masonry'; setLayoutMode(nextMode, { force: true }); if(nextMode === 'flow') saveChips(); });
+    if(oneLineToggleBtn) oneLineToggleBtn.addEventListener('click', ()=>{ const nextMode = layoutConfig.mode === 'stack' ? 'flow' : 'stack'; setLayoutMode(nextMode, { force: true }); if(nextMode === 'flow') saveChips(); });
 
-    function loadChips(){
-      renderSaveSelector();
-      const activeSave = getActiveSave();
-      replaceChips(activeSave ? activeSave.chips : [], { persist: false, focus: false });
-    }
-
-    function activateSave(id){
-      if(typeof id !== 'string' || id === saveState.activeId) return;
-      if(!saveState.saves.some(save => save.id === id)) return;
-      saveChips();
-      saveState.activeId = id;
-      persistSaveState();
-      renderSaveSelector();
-      const activeSave = getActiveSave();
-      replaceChips(activeSave ? activeSave.chips : [], { persist: false });
-    }
-
-    function createNewSave(){
-      saveChips();
-      const newSave = {
-        id: makeSaveId(),
-        name: nextSaveName(saveState.saves),
-        chips: []
-      };
-      saveState.saves.push(newSave);
-      saveState.activeId = newSave.id;
-      persistSaveState();
-      renderSaveSelector();
-      replaceChips([], { persist: false });
-    }
-
-    function addFromInput(){
-      const value=input.value.trim();
-      if(!value) return;
-      const node=createChip(value);
-      list.appendChild(node);
-      scheduleLayout();
-      saveChips();
-      input.value='';
-      input.focus();
-    }
-    function clearAllChips(){
-      if(!list) return;
-      list.innerHTML='';
-      chipSequence = 0;
-      scheduleLayout();
-      saveChips();
-      if(input) input.focus();
-    }
-    loadChips();
-    scheduleLayout();
-    settingsReady = true;
-    persistSettings();
-    updateLayoutModeUI();
-
-    if(saveSelect){
-      saveSelect.addEventListener('change', ()=>activateSave(saveSelect.value));
-    }
-
-    if(newSaveBtn){
-      newSaveBtn.addEventListener('click', createNewSave);
-    }
-
-    if(masonryToggleBtn){
-      masonryToggleBtn.addEventListener('click', ()=>{
-        const nextMode = layoutConfig.mode === 'masonry' ? 'flow' : 'masonry';
-        setLayoutMode(nextMode, { force: true });
-        if(nextMode === 'flow'){
-          saveChips();
-        }
-      });
-    }
-
-    if(oneLineToggleBtn){
-      oneLineToggleBtn.addEventListener('click', ()=>{
-        const nextMode = layoutConfig.mode === 'stack' ? 'flow' : 'stack';
-        setLayoutMode(nextMode, { force: true });
-        if(nextMode === 'flow'){
-          saveChips();
-        }
-      });
-    }
-
-    if(exportBtn){
-      exportBtn.addEventListener('click', ()=>{
-        const payload = getChipData();
-        const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = EXPORT_FILENAME;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(()=>URL.revokeObjectURL(url), 0);
-      });
-    }
-
+    if(exportBtn){ exportBtn.addEventListener('click', ()=>{ const payload = getChipData(); const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = EXPORT_FILENAME; document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(()=>URL.revokeObjectURL(url), 0); }); }
     if(importBtn && importFileInput){
-      importBtn.addEventListener('click', ()=>{
-        importFileInput.value = '';
-        importFileInput.click();
-      });
+      importBtn.addEventListener('click', ()=>{ importFileInput.value = ''; importFileInput.click(); });
       importFileInput.addEventListener('change', ()=>{
-        const file = importFileInput.files && importFileInput.files[0];
-        if(!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          try{
-            const text = reader.result;
-            const parsed = JSON.parse(typeof text === 'string' ? text : '');
-            if(!Array.isArray(parsed)) throw new Error('Invalid JSON');
-            replaceChips(parsed);
-          }catch(err){
-            console.warn('Import failed:', err);
-            alert('Import failed. Please choose a valid export JSON file.');
-          }finally{
-            importFileInput.value = '';
-          }
-        };
-        reader.onerror = () => {
-          console.warn('Import file read error:', reader.error);
-          alert('Could not read the selected file.');
-          importFileInput.value = '';
-        };
+        const file = importFileInput.files && importFileInput.files[0]; if(!file) return; const reader = new FileReader();
+        reader.onload = () => { try{ const text = reader.result; const parsed = JSON.parse(typeof text === 'string' ? text : ''); if(!Array.isArray(parsed)) throw new Error('Invalid JSON'); replaceChips(parsed); }catch(err){ console.warn('Import failed:', err); alert('Import failed. Please choose a valid export JSON file.'); }finally{ importFileInput.value = ''; } };
+        reader.onerror = () => { console.warn('Import file read error:', reader.error); alert('Could not read the selected file.'); importFileInput.value = ''; };
         reader.readAsText(file);
       });
     }
 
     addBtn.addEventListener('click', addFromInput);
     input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); addFromInput(); } });
-
-    // Delete key removes focused chip
     document.addEventListener('keydown', (e)=>{
       if((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && typeof e.key==='string' && e.key.toLowerCase()==='d'){
-        if(isTypingContext(e.target)) return;
-        e.preventDefault();
-        if(window.confirm('Delete all items?')){
-          clearAllChips();
-        }
-        return;
+        if(isTypingContext(e.target)) return; e.preventDefault(); if(window.confirm('Delete all items?')) clearAllChips(); return;
       }
     });
     document.addEventListener('keydown', (e)=>{
-      if(e.key!=='Delete' || isTypingContext(e.target)) return;
-      const active = document.activeElement;
-      if(active && active.classList && active.classList.contains('btn-item')){
-        e.preventDefault();
-        const btn = active;
-        const host = btn.closest('.btn-wrap');
-        if(host){
-          if(chipResizeObserver) chipResizeObserver.unobserve(btn);
-          host.remove();
-          scheduleLayout();
-          saveChips();
-        }
-        input.focus();
-      }
+      if(e.key!=='Delete' || isTypingContext(e.target)) return; const active = document.activeElement;
+      if(active && active.classList && active.classList.contains('btn-item')){ e.preventDefault(); const btn = active; const host = btn.closest('.btn-wrap'); if(host){ if(chipResizeObserver) chipResizeObserver.unobserve(btn); host.remove(); scheduleLayout(); saveChips(); } input.focus(); }
     });
 
-    // Toggle emojis on existing chips
     const reEmojiBtn=document.getElementById('reEmoji');
     if(reEmojiBtn){
       reEmojiBtn.addEventListener('click', ()=>{
-        const buttons=Array.from(list.querySelectorAll('.btn-item'));
-        const removeEmojis=buttons.some(btn=>startsWithEmoji(btn.textContent||''));
-        let changed=0;
-        buttons.forEach(btn=>{
-          const txt=btn.textContent||'';
-          if(removeEmojis){
-            const clean=removeLeadingEmoji(txt);
-            if(clean!==txt){ btn.textContent=clean; changed++; }
-          }else if(!startsWithEmoji(txt)){
-            const em=detectEmoji(txt);
-            if(em){ btn.textContent=em+' '+txt; changed++; }
-          }
-        });
+        const buttons=Array.from(list.querySelectorAll('.btn-item')); const removeEmojis=buttons.some(btn=>startsWithEmoji(btn.textContent||'')); let changed=0;
+        buttons.forEach(btn=>{ const txt=btn.textContent||''; if(removeEmojis){ const clean=removeLeadingEmoji(txt); if(clean!==txt){ btn.textContent=clean; changed++; } }else if(!startsWithEmoji(txt)){ const em=detectEmoji(txt); if(em){ btn.textContent=em+' '+txt; changed++; } } });
         try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){}
-        reEmojiBtn.title = removeEmojis
-          ? (changed ? ('Removed emojis from '+changed+' chip'+(changed===1?'':'s')) : 'No emojis to remove')
-          : (changed ? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)');
-        refreshChipMetrics();
-        saveChips();
+        reEmojiBtn.title = removeEmojis ? (changed ? ('Removed emojis from '+changed+' chip'+(changed===1?'':'s')) : 'No emojis to remove') : (changed ? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)');
+        refreshChipMetrics(); saveChips();
       });
     }
 
-    // ===== Smoke tests (manual) =====
     function runSmokeTests(){ try{ const before=list.children.length; if(emojiToggle) emojiToggle.checked=true; ['Bug','Kaffeemaschine','Lift','YouTube','TikTok','Webseite','Computer','Netzwerk','Drucker'].forEach(t=>{ input.value=t; addFromInput(); }); const after=list.children.length; console.assert(after>=before+9, 'Should add 9 chips'); const first=list.querySelector('.btn-item'); console.assert(first && /\p{Extended_Pictographic}/u.test(first.textContent.trim().charAt(0))===true, 'First chip should start with an emoji'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===1,'First cycle should set stage 1'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===2,'Second cycle should set stage 2'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===3,'Third cycle should set stage 3'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===0,'Fourth cycle should reset stage'); const emojiBtn=document.getElementById('reEmoji'); emojiBtn.click(); console.assert(!startsWithEmoji(first.textContent),'Emoji button should remove leading emojis'); emojiBtn.click(); console.assert(startsWithEmoji(first.textContent),'Emoji button should add leading emojis'); }catch(e){ console.warn('Smoke tests issue (non-fatal):', e); } }
-    try{ if(new URLSearchParams(location.search).get('tests')==='1') runSmokeTests(); }catch(_){ }
+    try{ if(new URLSearchParams(location.search).get('tests')==='1') runSmokeTests(); }catch(_){}
   </script>
 </body>
 </html>
