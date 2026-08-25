@@ -430,14 +430,6 @@
     .label{min-height:34px;padding:.34rem .58rem}
     #reEmoji,#masonryToggle,#oneLineToggle{min-height:34px}
 
-    label:has(#autoEmoji){font-size:0}
-    label:has(#autoEmoji)::after{
-      content:'Auto-Emoji';
-      font-size:.84rem;
-      font-weight:650;
-      color:#334155;
-    }
-
     .label input[type="range"]{
       -webkit-appearance:none;
       appearance:none;
@@ -1243,8 +1235,7 @@
         <div class="options-row">
           <div id="mainControlsHost" class="control-group" style="flex-wrap:wrap; gap:.75rem">
             <label data-placement-control="color" class="label" title="Give new chips a random background color"><input id="randColor" type="checkbox" checked> Color</label>
-            <label data-placement-control="autoEmoji" class="label" title="Automatically prepend an emoji based on the text"><input id="autoEmoji" type="checkbox"> Emoji</label>
-            <button data-placement-control="emoji" id="reEmoji" type="button" title="Add or remove emojis on all existing chips" class="btn">Emoji</button>
+            <button data-placement-control="emoji" id="reEmoji" type="button" class="btn" aria-pressed="false" title="Emoji-Modus: neue Chips automatisch mit passendem Emoji">Emoji</button>
             <label data-placement-control="size" class="label" style="gap:.35rem" title="Adjust chip base size"><span>Size</span>
               <input id="chipSize" type="range" min="0.6" max="6" step="0.005" value="1" />
             </label>
@@ -1282,7 +1273,7 @@
     const input = document.getElementById('topicInput');
     const addBtn = document.getElementById('addBtn');
     const randToggle = document.getElementById('randColor');
-    const emojiToggle = document.getElementById('autoEmoji');
+    const emojiModeBtn = document.getElementById('reEmoji');
     const exportBtn = document.getElementById('exportBtn');
     const exportMenu = document.getElementById('exportMenu');
     const importBtn = document.getElementById('importBtn');
@@ -1360,6 +1351,8 @@
     const HISTORY_LIMIT = 30;
     const undoStack = [];
     const BEAMER_THEME_KEY = 'discussion.beamerTheme.v1';
+    const EMOJI_MODE_KEY = 'discussion.emojiMode.v1';
+    let emojiMode = readStorage(EMOJI_MODE_KEY) === '1';
     const CHIP_FOCUS_CLASS = 'chip-focus';
     const CHIP_GROUPS = new Set(['pro','contra','fragen']);
     const TIMER_STORAGE_KEY = 'discussion.timer.v1';
@@ -2257,7 +2250,22 @@
     ];
 
     function detectEmoji(label){ if(label.includes('?')) return '❓'; if(label.includes('!')) return '❗'; for(const r of emojiRules) if(hasAny(label,r.words)) return r.e; return ''; }
-    function maybeAddEmoji(label){ if(!emojiToggle||!emojiToggle.checked) return label; if(startsWithEmoji(label)) return label; const em=detectEmoji(label); return em? (em+' '+label):label; }
+    function maybeAddEmoji(label){ if(!emojiMode) return label; if(startsWithEmoji(label)) return label; const em=detectEmoji(label); return em? (em+' '+label):label; }
+
+    function syncEmojiModeUI(){
+      if(!emojiModeBtn) return;
+      emojiModeBtn.classList.toggle('btn-primary', emojiMode);
+      emojiModeBtn.setAttribute('aria-pressed', String(emojiMode));
+      emojiModeBtn.title = emojiMode
+        ? 'Emoji-Modus aktiv: neue Chips erhalten automatisch ein passendes Emoji'
+        : 'Emoji-Modus aus: neue Chips werden ohne automatisches Emoji erstellt';
+    }
+
+    function setEmojiMode(active){
+      emojiMode = Boolean(active);
+      writeStorage(EMOJI_MODE_KEY, emojiMode ? '1' : '0');
+      syncEmojiModeUI();
+    }
 
     // ===== Chip helpers =====
     function clearChipInlineSizing(btn){
@@ -3508,35 +3516,17 @@
       }
     });
 
-    // Toggle emojis on existing chips
-    const reEmojiBtn=document.getElementById('reEmoji');
-    if(reEmojiBtn){
-      reEmojiBtn.addEventListener('click', ()=>{
-        const buttons=Array.from(list.querySelectorAll('.btn-item'));
-        const removeEmojis=buttons.some(btn=>startsWithEmoji(btn.textContent||''));
-        if(buttons.length) pushUndoSnapshot();
-        let changed=0;
-        buttons.forEach(btn=>{
-          const txt=btn.textContent||'';
-          if(removeEmojis){
-            const clean=removeLeadingEmoji(txt);
-            if(clean!==txt){ btn.textContent=clean; changed++; }
-          }else if(!startsWithEmoji(txt)){
-            const em=detectEmoji(txt);
-            if(em){ btn.textContent=em+' '+txt; changed++; }
-          }
-        });
-        try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){}
-        reEmojiBtn.title = removeEmojis
-          ? (changed ? ('Removed emojis from '+changed+' chip'+(changed===1?'':'s')) : 'No emojis to remove')
-          : (changed ? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)');
-        refreshChipMetrics();
-        saveChips();
+    // Emoji mode affects newly created chips only; existing chips stay unchanged.
+    if(emojiModeBtn){
+      syncEmojiModeUI();
+      emojiModeBtn.addEventListener('click', ()=>{
+        setEmojiMode(!emojiMode);
+        try{ emojiModeBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:180}); }catch(err){}
       });
     }
 
     // ===== Smoke tests (manual) =====
-    function runSmokeTests(){ try{ const before=list.children.length; if(emojiToggle) emojiToggle.checked=true; ['Bug','Kaffeemaschine','Lift','YouTube','TikTok','Webseite','Computer','Netzwerk','Drucker'].forEach(t=>{ input.value=t; addFromInput(); }); const after=list.children.length; console.assert(after>=before+9, 'Should add 9 chips'); const first=list.querySelector('.btn-item'); console.assert(first && /\p{Extended_Pictographic}/u.test(first.textContent.trim().charAt(0))===true, 'First chip should start with an emoji'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===1,'First cycle should set stage 1'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===2,'Second cycle should set stage 2'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===3,'Third cycle should set stage 3'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===0,'Fourth cycle should reset stage'); const emojiBtn=document.getElementById('reEmoji'); emojiBtn.click(); console.assert(!startsWithEmoji(first.textContent),'Emoji button should remove leading emojis'); emojiBtn.click(); console.assert(startsWithEmoji(first.textContent),'Emoji button should add leading emojis'); }catch(e){ console.warn('Smoke tests issue (non-fatal):', e); } }
+    function runSmokeTests(){ try{ const before=list.children.length; setEmojiMode(true); ['Bug','Kaffeemaschine','Lift','YouTube','TikTok','Webseite','Computer','Netzwerk','Drucker'].forEach(t=>{ input.value=t; addFromInput(); }); const after=list.children.length; console.assert(after>=before+9, 'Should add 9 chips'); const first=list.querySelector('.btn-item'); console.assert(first && /\p{Extended_Pictographic}/u.test(first.textContent.trim().charAt(0))===true, 'First chip should start with an emoji'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===1,'First cycle should set stage 1'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===2,'Second cycle should set stage 2'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===3,'Third cycle should set stage 3'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===0,'Fourth cycle should reset stage'); const beforeToggle = first.textContent; setEmojiMode(false); console.assert(first.textContent===beforeToggle,'Changing Emoji mode must not rewrite existing chips'); }catch(e){ console.warn('Smoke tests issue (non-fatal):', e); } }
     try{ if(new URLSearchParams(location.search).get('tests')==='1') runSmokeTests(); }catch(_){ }
   </script>
 
@@ -3586,7 +3576,6 @@
 
       const controls = [
         { key:'color', label:'Color', defaultPlace:'main' },
-        { key:'autoEmoji', label:'Auto-Emoji', defaultPlace:'main' },
         { key:'emoji', label:'Emoji', defaultPlace:'main' },
         { key:'size', label:'Size', defaultPlace:'main' },
         { key:'shape', label:'Form', defaultPlace:'settings' },
