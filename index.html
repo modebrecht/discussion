@@ -32,10 +32,13 @@
 
     /* Header / toolbar */
     .toolbar{background:#fff; box-shadow:var(--shadow);}
-    .toolbar-inner{max-width:64rem; margin:0 auto; padding:.75rem 1rem; display:flex; align-items:center; gap:.75rem}
+    .toolbar-inner{max-width:64rem; margin:0 auto; padding:.75rem 1rem; display:flex; flex-wrap:wrap; align-items:center; gap:.75rem}
     .logo-pill{height:24px; width:24px; border-radius:12px; display:grid; place-items:center; font:600 12px/1.1 ui-sans-serif; background:var(--panel); color:var(--panel-ink)}
     .title{font-weight:600; font-size:1.125rem; letter-spacing:.01em}
-    .font-controls{margin-inline-start:auto; display:flex; align-items:center; gap:.5rem}
+    .save-controls{margin-inline-start:auto; display:flex; align-items:center; gap:.4rem; min-width:0}
+    .save-select{max-width:180px; min-width:132px; border:1px solid #d1d5db; background:#fff; color:#111827; border-radius:var(--radius); padding:.4rem 1.8rem .4rem .65rem; font-size:.875rem; font-weight:600; line-height:1.1}
+    .save-select:focus{outline:none; border-color:#22d3ee; box-shadow:var(--ring)}
+    .font-controls{margin-inline-start:0; display:flex; flex-wrap:wrap; align-items:center; gap:.5rem}
     .font-pct{opacity:.9; font-size:.75rem; line-height:1}
 
     /* Layout */
@@ -119,6 +122,11 @@
         <div class="logo-pill" title="Theme accent">D</div>
         <h1 class="title">Discussion Board</h1>
       </div>
+      <div class="save-controls">
+        <label for="saveSelect" class="sr-only">Current save</label>
+        <select id="saveSelect" class="save-select" title="Current save"></select>
+        <button id="newSaveBtn" type="button" class="btn btn-primary" title="Create a new empty save">NEW</button>
+      </div>
       <div class="font-controls">
         <button id="importBtn" type="button" class="btn" title="Import chips from a file">Import</button>
         <button id="exportBtn" type="button" class="btn" title="Download chips as a file">Export</button>
@@ -176,8 +184,11 @@
     const oneLineToggleBtn = document.getElementById('oneLineToggle');
     const chipSizeInput = document.getElementById('chipSize');
     const chipMarginInput = document.getElementById('chipMargin');
+    const saveSelect = document.getElementById('saveSelect');
+    const newSaveBtn = document.getElementById('newSaveBtn');
 
-    const STORAGE_KEY = 'discussion.chips.v1';
+    const LEGACY_STORAGE_KEY = 'discussion.chips.v1';
+    const SAVE_STORAGE_KEY = 'discussion.saves.v1';
     const SETTINGS_KEY = 'discussion.settings.v1';
     const EXPORT_FILENAME = 'discussion-chips.json';
     const layoutConfig = { step: 4, gutter: 8, chipScale: 1, mode: 'flow' };
@@ -214,6 +225,98 @@
       try { storage.removeItem(key); }
       catch (err) { console.warn('Local storage remove failed:', err); }
     };
+
+    function saveDatePrefix(date = new Date()){
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      return `${day}${month}-${date.getFullYear()}`;
+    }
+
+    function nextSaveName(saves, date = new Date()){
+      const prefix = saveDatePrefix(date);
+      let max = 0;
+      (Array.isArray(saves) ? saves : []).forEach(save => {
+        if(!save || typeof save.name !== 'string') return;
+        const marker = prefix + '#';
+        if(!save.name.startsWith(marker)) return;
+        const number = Number(save.name.slice(marker.length));
+        if(Number.isInteger(number) && number > max) max = number;
+      });
+      return `${prefix}#${max + 1}`;
+    }
+
+    function makeSaveId(){
+      return `save-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+    }
+
+    function normalizeSaveState(parsed){
+      if(!parsed || !Array.isArray(parsed.saves)) return null;
+      const saves = parsed.saves
+        .filter(save => save && typeof save.id === 'string' && typeof save.name === 'string')
+        .map(save => ({
+          id: save.id,
+          name: save.name,
+          chips: Array.isArray(save.chips) ? save.chips : []
+        }));
+      if(!saves.length) return null;
+      const activeId = saves.some(save => save.id === parsed.activeId) ? parsed.activeId : saves[0].id;
+      return { activeId, saves };
+    }
+
+    function loadSaveState(){
+      const raw = readStorage(SAVE_STORAGE_KEY);
+      if(raw){
+        try{
+          const normalized = normalizeSaveState(JSON.parse(raw));
+          if(normalized) return normalized;
+        }catch(err){
+          console.warn('Save collection parse failed:', err);
+        }
+      }
+
+      let legacyChips = [];
+      const legacyRaw = readStorage(LEGACY_STORAGE_KEY);
+      if(legacyRaw){
+        try{
+          const parsedLegacy = JSON.parse(legacyRaw);
+          if(Array.isArray(parsedLegacy)) legacyChips = parsedLegacy;
+        }catch(err){
+          console.warn('Legacy chip storage parse failed:', err);
+        }
+      }
+
+      const firstSave = {
+        id: makeSaveId(),
+        name: nextSaveName([]),
+        chips: legacyChips
+      };
+      const state = { activeId: firstSave.id, saves: [firstSave] };
+      writeStorage(SAVE_STORAGE_KEY, JSON.stringify(state));
+      if(legacyRaw) removeStorage(LEGACY_STORAGE_KEY);
+      return state;
+    }
+
+    let saveState = loadSaveState();
+
+    function persistSaveState(){
+      writeStorage(SAVE_STORAGE_KEY, JSON.stringify(saveState));
+    }
+
+    function getActiveSave(){
+      return saveState.saves.find(save => save.id === saveState.activeId) || saveState.saves[0] || null;
+    }
+
+    function renderSaveSelector(){
+      if(!saveSelect) return;
+      saveSelect.innerHTML = '';
+      saveState.saves.forEach(save => {
+        const option = document.createElement('option');
+        option.value = save.id;
+        option.textContent = save.name;
+        option.selected = save.id === saveState.activeId;
+        saveSelect.appendChild(option);
+      });
+    }
 
     const defaultSettings = { chipScale: 1, gutter: 8 };
     const sliderBounds = {
@@ -1107,12 +1210,10 @@
 
     function saveChips(){
       if(!list) return;
-      const payload = getChipData();
-      if(payload.length){
-        writeStorage(STORAGE_KEY, JSON.stringify(payload));
-      }else{
-        removeStorage(STORAGE_KEY);
-      }
+      const activeSave = getActiveSave();
+      if(!activeSave) return;
+      activeSave.chips = getChipData();
+      persistSaveState();
     }
 
     function appendChipFromData(item){
@@ -1135,7 +1236,7 @@
       }
     }
 
-    function replaceChips(data){
+    function replaceChips(data, { persist = true, focus = true } = {}){
       if(!list) return;
       list.innerHTML = '';
       chipSequence = 0;
@@ -1143,24 +1244,40 @@
       restoreCreationOrder();
       setLayoutMode('flow', { force: true, reorder: false });
       refreshChipMetrics();
-      saveChips();
-      if(input) input.focus();
+      if(persist) saveChips();
+      if(focus && input) input.focus();
       scheduleLayout();
     }
 
     function loadChips(){
-      if(!list) return;
-      const raw = readStorage(STORAGE_KEY);
-      if(!raw) return;
-      let parsed;
-      try{ parsed = JSON.parse(raw); }
-      catch(err){ console.warn('Local storage parse failed:', err); return; }
-      if(!Array.isArray(parsed)) return;
-      parsed.forEach(appendChipFromData);
-      restoreCreationOrder();
-      setLayoutMode('flow', { force: true, reorder: false });
-      refreshChipMetrics();
-      scheduleLayout();
+      renderSaveSelector();
+      const activeSave = getActiveSave();
+      replaceChips(activeSave ? activeSave.chips : [], { persist: false, focus: false });
+    }
+
+    function activateSave(id){
+      if(typeof id !== 'string' || id === saveState.activeId) return;
+      if(!saveState.saves.some(save => save.id === id)) return;
+      saveChips();
+      saveState.activeId = id;
+      persistSaveState();
+      renderSaveSelector();
+      const activeSave = getActiveSave();
+      replaceChips(activeSave ? activeSave.chips : [], { persist: false });
+    }
+
+    function createNewSave(){
+      saveChips();
+      const newSave = {
+        id: makeSaveId(),
+        name: nextSaveName(saveState.saves),
+        chips: []
+      };
+      saveState.saves.push(newSave);
+      saveState.activeId = newSave.id;
+      persistSaveState();
+      renderSaveSelector();
+      replaceChips([], { persist: false });
     }
 
     function addFromInput(){
@@ -1186,6 +1303,14 @@
     settingsReady = true;
     persistSettings();
     updateLayoutModeUI();
+
+    if(saveSelect){
+      saveSelect.addEventListener('change', ()=>activateSave(saveSelect.value));
+    }
+
+    if(newSaveBtn){
+      newSaveBtn.addEventListener('click', createNewSave);
+    }
 
     if(masonryToggleBtn){
       masonryToggleBtn.addEventListener('click', ()=>{
