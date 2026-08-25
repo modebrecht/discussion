@@ -142,7 +142,7 @@
           <div class="control-group" style="flex-wrap:wrap; gap:.75rem">
             <label class="label" title="Give new chips a random background color"><input id="randColor" type="checkbox" checked> Color</label>
             <label class="label" title="Automatically prepend an emoji based on the text"><input id="autoEmoji" type="checkbox"> Emoji</label>
-            <button id="reEmoji" type="button" title="Re-scan all chips and prepend emojis where missing" class="btn">Re-emoji</button>
+            <button id="reEmoji" type="button" title="Add or remove emojis on all existing chips" class="btn">Emoji</button>
             <label class="label" style="gap:.35rem" title="Adjust pill base size"><span>Size</span>
               <input id="chipSize" type="range" min="0.6" max="6" step="0.005" value="1" />
             </label>
@@ -603,6 +603,13 @@
 
     // ===== Emoji utilities =====
     function startsWithEmoji(str){ const s=(str||'').trim(); if(!s) return false; const cp=s.codePointAt(0); return (cp>=0x1F300&&cp<=0x1FAFF)||(cp>=0x2600&&cp<=0x27BF); }
+    function removeLeadingEmoji(str){
+      const s=(str||'').trimStart();
+      if(!s || !startsWithEmoji(s)) return str||'';
+      const cp=s.codePointAt(0);
+      const firstLength=cp>0xFFFF ? 2 : 1;
+      return s.slice(firstLength).replace(/^\uFE0F?\s*/, '');
+    }
     function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
     function hasAny(label,words){
       const l=norm(label);
@@ -1277,12 +1284,34 @@
       }
     });
 
-    // Re-emoji existing chips
+    // Toggle emojis on existing chips
     const reEmojiBtn=document.getElementById('reEmoji');
-    if(reEmojiBtn){ reEmojiBtn.addEventListener('click', ()=>{ let changed=0; list.querySelectorAll('.btn-item').forEach(btn=>{ const txt=btn.textContent||''; if(!startsWithEmoji(txt)){ const em=detectEmoji(txt); if(em){ btn.textContent=em+' '+txt; changed++; } } }); try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){} reEmojiBtn.title = changed? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)'; refreshChipMetrics(); saveChips(); }); }
+    if(reEmojiBtn){
+      reEmojiBtn.addEventListener('click', ()=>{
+        const buttons=Array.from(list.querySelectorAll('.btn-item'));
+        const removeEmojis=buttons.some(btn=>startsWithEmoji(btn.textContent||''));
+        let changed=0;
+        buttons.forEach(btn=>{
+          const txt=btn.textContent||'';
+          if(removeEmojis){
+            const clean=removeLeadingEmoji(txt);
+            if(clean!==txt){ btn.textContent=clean; changed++; }
+          }else if(!startsWithEmoji(txt)){
+            const em=detectEmoji(txt);
+            if(em){ btn.textContent=em+' '+txt; changed++; }
+          }
+        });
+        try{ reEmojiBtn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:220}); }catch(err){}
+        reEmojiBtn.title = removeEmojis
+          ? (changed ? ('Removed emojis from '+changed+' chip'+(changed===1?'':'s')) : 'No emojis to remove')
+          : (changed ? ('Added emojis to '+changed+' chip'+(changed===1?'':'s')) : 'No changes (nothing matched)');
+        refreshChipMetrics();
+        saveChips();
+      });
+    }
 
     // ===== Smoke tests (manual) =====
-    function runSmokeTests(){ try{ const before=list.children.length; if(emojiToggle) emojiToggle.checked=true; ['Bug','Kaffeemaschine','Lift','YouTube','TikTok','Webseite','Computer','Netzwerk','Drucker'].forEach(t=>{ input.value=t; addFromInput(); }); const after=list.children.length; console.assert(after>=before+9, 'Should add 9 chips'); const first=list.querySelector('.btn-item'); console.assert(first && /\p{Extended_Pictographic}/u.test(first.textContent.trim().charAt(0))===true, 'First chip should start with an emoji'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===1,'First cycle should set stage 1'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===2,'Second cycle should set stage 2'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===3,'Third cycle should set stage 3'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===0,'Fourth cycle should reset stage'); document.getElementById('reEmoji').click(); console.assert(/^\p{Extended_Pictographic}\s/u.test(first.textContent)===true,'Re-emoji should keep single leading emoji'); }catch(e){ console.warn('Smoke tests issue (non-fatal):', e); } }
+    function runSmokeTests(){ try{ const before=list.children.length; if(emojiToggle) emojiToggle.checked=true; ['Bug','Kaffeemaschine','Lift','YouTube','TikTok','Webseite','Computer','Netzwerk','Drucker'].forEach(t=>{ input.value=t; addFromInput(); }); const after=list.children.length; console.assert(after>=before+9, 'Should add 9 chips'); const first=list.querySelector('.btn-item'); console.assert(first && /\p{Extended_Pictographic}/u.test(first.textContent.trim().charAt(0))===true, 'First chip should start with an emoji'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===1,'First cycle should set stage 1'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===2,'Second cycle should set stage 2'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===3,'Third cycle should set stage 3'); first.click(); console.assert(Number(first.dataset.scaleStage||'0')===0,'Fourth cycle should reset stage'); const emojiBtn=document.getElementById('reEmoji'); emojiBtn.click(); console.assert(!startsWithEmoji(first.textContent),'Emoji button should remove leading emojis'); emojiBtn.click(); console.assert(startsWithEmoji(first.textContent),'Emoji button should add leading emojis'); }catch(e){ console.warn('Smoke tests issue (non-fatal):', e); } }
     try{ if(new URLSearchParams(location.search).get('tests')==='1') runSmokeTests(); }catch(_){ }
   </script>
 </body>
