@@ -32,13 +32,13 @@
 
     /* Header / toolbar */
     .toolbar{background:#fff; box-shadow:var(--shadow);}
-    .toolbar-inner{max-width:64rem; margin:0 auto; padding:.75rem 1rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap}
+    .toolbar-inner{max-width:64rem; margin:0 auto; padding:.75rem 1rem; display:flex; flex-wrap:wrap; align-items:center; gap:.75rem}
     .logo-pill{height:24px; width:24px; border-radius:12px; display:grid; place-items:center; font:600 12px/1.1 ui-sans-serif; background:var(--panel); color:var(--panel-ink)}
     .title{font-weight:600; font-size:1.125rem; letter-spacing:.01em}
-    .save-controls{margin-inline-start:auto; display:flex; align-items:center; gap:.5rem; min-width:0}
-    .save-select{min-width:148px; max-width:220px; border:1px solid #d1d5db; border-radius:var(--radius); padding:.4rem .65rem; font-size:.875rem; font-weight:600; line-height:1.1; background:#fff; color:#111827}
-    .save-select:focus{outline:none; box-shadow:var(--ring); border-color:#22d3ee}
-    .font-controls{display:flex; align-items:center; gap:.5rem; flex-wrap:wrap}
+    .save-controls{margin-inline-start:auto; display:flex; align-items:center; gap:.4rem; min-width:0}
+    .save-select{max-width:180px; min-width:132px; border:1px solid #d1d5db; background:#fff; color:#111827; border-radius:var(--radius); padding:.4rem 1.8rem .4rem .65rem; font-size:.875rem; font-weight:600; line-height:1.1}
+    .save-select:focus{outline:none; border-color:#22d3ee; box-shadow:var(--ring)}
+    .font-controls{margin-inline-start:0; display:flex; flex-wrap:wrap; align-items:center; gap:.5rem}
     .font-pct{opacity:.9; font-size:.75rem; line-height:1}
 
     /* Layout */
@@ -628,15 +628,15 @@
 
     // ===== Color utilities =====
     const BEAMER_COLORS = [
-      '#60A5FA', // blue
-      '#22D3EE', // cyan
-      '#2DD4BF', // teal
-      '#A3E635', // lime
-      '#FACC15', // yellow
-      '#FB923C', // orange
-      '#FB7185', // coral
-      '#C084FC', // violet
-      '#F472B6'  // pink
+      '#60A5FA',
+      '#22D3EE',
+      '#2DD4BF',
+      '#A3E635',
+      '#FACC15',
+      '#FB923C',
+      '#FB7185',
+      '#C084FC',
+      '#F472B6'
     ];
     function randomColorHex(){ return BEAMER_COLORS[Math.floor(Math.random()*BEAMER_COLORS.length)]; }
     function hexToRgb(hex){ const n = parseInt(hex.slice(1),16); return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 }; }
@@ -784,6 +784,7 @@
 
     function forceChipStyleSync(btn){
       if(!(btn instanceof HTMLElement)) return;
+      // Access layout to flush pending style updates before measuring.
       void btn.offsetWidth;
     }
 
@@ -792,9 +793,11 @@
       const { style } = btn;
       const prev = style.transition;
       style.transition = 'none';
+      // Flush so the no-transition state takes effect immediately.
       void btn.offsetWidth;
       return () => {
         style.transition = prev;
+        // Flush again so re-enabled transitions apply to subsequent changes.
         void btn.offsetWidth;
       };
     }
@@ -1389,6 +1392,7 @@
     addBtn.addEventListener('click', addFromInput);
     input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); addFromInput(); } });
 
+    // Delete key removes focused chip
     document.addEventListener('keydown', (e)=>{
       if((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && typeof e.key==='string' && e.key.toLowerCase()==='d'){
         if(isTypingContext(e.target)) return;
