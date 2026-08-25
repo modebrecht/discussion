@@ -1,0 +1,45 @@
+name: Apply export menu
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-export-menu.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply export patch
+        run: python3 .github/apply_export_menu.py
+      - name: Syntax check scripts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          text = Path('index.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script>(.*?)</script>', text, flags=re.S)
+          if not scripts:
+              raise SystemExit('No scripts found')
+          for index, script in enumerate(scripts):
+              p = Path(f'/tmp/discussion-script-{index}.js')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['node', '--check', str(p)], check=True)
+          print(f'Checked {len(scripts)} script blocks')
+          PY
+      - name: Commit result
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          if git diff --cached --quiet; then
+            echo 'No changes'
+            exit 0
+          fi
+          git commit -m 'Add JSON PNG SVG board export [skip ci]'
+          git push
