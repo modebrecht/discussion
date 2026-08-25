@@ -42,6 +42,12 @@ if 'padding: chipPaddingInput ? {' not in text:
         raise SystemExit('Could not locate slider bounds')
     text = text.replace(needle, addition, 1)
 
+# Allow a real 0px margin (0 must not fall through via `||`).
+text = text.replace(
+    "        min: parseFloat(chipMarginInput.min) || defaultSettings.gutter,",
+    "        min: Number.isFinite(parseFloat(chipMarginInput.min)) ? parseFloat(chipMarginInput.min) : defaultSettings.gutter,"
+)
+
 # Persist padding.
 if 'chipPadding: Number(chipPadding.toFixed(1))' not in text:
     needle = "        chipScale: Number(chipScale.toFixed(3)),\n        gutter: Math.round(layoutConfig.gutter)\n"
