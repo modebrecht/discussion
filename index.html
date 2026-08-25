@@ -2067,7 +2067,6 @@
         forceChipStyleSync(btn);
         btn.dataset.scaleStage = '0';
         btn.dataset.metrics = '0';
-      btn.dataset.votes = String(Math.max(0, Math.round(Number(options.votes || 0)) || 0));
         updateBaseMetrics(btn);
         restoreTransitions();
       }else if(btn.dataset.metrics!=='1'){
@@ -2514,6 +2513,7 @@
       btn.dataset.label = label;
       btn.dataset.scaleStage = '0';
       btn.dataset.metrics = '0';
+      btn.dataset.votes = String(Math.max(0, Math.round(Number(options.votes || 0)) || 0));
       if(options.pinned){
         btn.dataset.pinned = '1';
         btn.classList.add('chip-pinned');
