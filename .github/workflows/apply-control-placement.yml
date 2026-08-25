@@ -16,7 +16,7 @@ jobs:
         with:
           ref: main
 
-      - name: Apply focused control placement patch
+      - name: Apply settings overflow polish
         run: python .github/apply_control_placement.py
 
       - name: Syntax check scripts
@@ -36,9 +36,7 @@ jobs:
           grep -q 'id="settingsControlsHost"' index.html
           grep -q 'id="placementEditor"' index.html
           grep -q 'discussion.controlPlacement.v1' index.html
-          grep -q 'Alles Hauptmenü' index.html
-          grep -q 'data-placement-control="shape"' index.html
-          grep -q 'data-placement-control="margin"' index.html
+          grep -q 'max-height:calc(100dvh - 5rem)' index.html
 
       - name: Commit result
         run: |
@@ -48,5 +46,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Let users place board controls in main menu or settings [skip ci]"
+          git commit -m "Keep configurable settings menu scrollable [skip ci]"
           git push origin HEAD:main
