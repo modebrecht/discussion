@@ -1314,6 +1314,19 @@
       });
     }
 
+    // ===== Classroom shortcuts =====
+    document.addEventListener('keydown', event => {
+      if(event.key === 'Escape' && document.documentElement.classList.contains('presentation-mode')){
+        setPresentationMode(false);
+        return;
+      }
+      if((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && typeof event.key === 'string' && event.key.toLowerCase() === 'z'){
+        if(isTypingContext(event.target)) return;
+        event.preventDefault();
+        undoLastAction();
+      }
+    });
+
     // ===== Hotkeys =====
     document.addEventListener('keydown', (e) => {
       if (isTypingContext(e.target) || e.altKey || e.ctrlKey || e.metaKey) return;
@@ -1924,6 +1937,7 @@
         }
       });
       wrap.appendChild(btn);
+      syncChipBadge(btn);
       return wrap;
     }
 
