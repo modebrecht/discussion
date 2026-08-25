@@ -1,0 +1,31 @@
+name: Apply color sequence and beamer width
+
+on:
+  push:
+    paths:
+      - .github/workflows/apply-color-width.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Apply focused patch
+        run: python .github/apply_color_width.py
+
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Avoid consecutive chip colors and widen beamer layout [skip ci]"
+          git push origin HEAD:main
