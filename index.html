@@ -973,7 +973,7 @@
 
   <style>
     /* ===== Menu structure cleanup ===== */
-    .settings-panel{width:min(330px,calc(100vw - 1rem));gap:.6rem}
+    .settings-panel{width:min(330px,calc(100vw - 1rem));max-height:calc(100dvh - 5rem);overflow:auto;overscroll-behavior:contain;gap:.6rem}
     .settings-title{font-size:.9rem;letter-spacing:-.01em}
     .settings-section{display:grid;gap:.58rem}
     .settings-section + .settings-section{padding-top:.7rem;border-top:1px solid #e8edf3}
