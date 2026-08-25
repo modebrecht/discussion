@@ -970,6 +970,59 @@
     html[data-beamer-theme="dark"] .export-menu-btn:focus-visible{background:#1e293b}
   </style>
 
+
+  <style>
+    /* ===== Menu structure cleanup ===== */
+    .settings-panel{width:min(330px,calc(100vw - 1rem));gap:.6rem}
+    .settings-title{font-size:.9rem;letter-spacing:-.01em}
+    .settings-section{display:grid;gap:.58rem}
+    .settings-section + .settings-section{padding-top:.7rem;border-top:1px solid #e8edf3}
+    .menu-section-title,.chip-menu-section-title{
+      color:#94a3b8;
+      font-size:.67rem;
+      font-weight:850;
+      letter-spacing:.08em;
+      line-height:1;
+      text-transform:uppercase;
+    }
+    .settings-choice-row{display:grid;grid-template-columns:72px 1fr;align-items:center;gap:.65rem;color:#334155;font-size:.82rem;font-weight:750}
+    .segmented-control{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:3px;border:1px solid #dbe3ee;border-radius:11px;background:#f1f5f9}
+    .segmented-btn{
+      min-height:31px;padding:.3rem .45rem;border:0;border-radius:8px;background:transparent;color:#475569;
+      font:800 .76rem/1 ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;cursor:pointer;
+    }
+    .segmented-btn:hover{background:rgba(255,255,255,.72)}
+    .segmented-btn.is-active{background:#fff;color:#0f172a;box-shadow:0 1px 5px rgba(15,23,42,.12)}
+
+    .timer-panel{gap:.56rem}
+    .timer-panel .menu-section-title{margin-top:.15rem}
+    .timer-presets{display:grid;grid-template-columns:repeat(4,1fr)}
+    .timer-preset{text-align:center}
+
+    .export-menu{min-width:174px;padding:6px;gap:2px}
+    .export-menu .menu-section-title{padding:.42rem .55rem .28rem}
+    .export-menu-btn{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.5rem .58rem}
+    .export-menu-btn strong{font-size:.8rem;color:inherit}
+    .export-menu-btn span{font-size:.7rem;font-weight:700;color:#94a3b8}
+
+    .chip-menu{width:200px;padding:6px;gap:2px}
+    .chip-menu-section-title{padding:.45rem .55rem .22rem}
+    .chip-menu-btn{position:relative}
+    .chip-menu-btn.is-active::after{content:'✓';margin-left:auto;font-weight:900;color:#0f172a}
+
+    html[data-beamer-theme="dark"] .settings-section + .settings-section{border-top-color:#263244}
+    html[data-beamer-theme="dark"] .settings-choice-row{color:#cbd5e1}
+    html[data-beamer-theme="dark"] .segmented-control{background:#111827;border-color:#334155}
+    html[data-beamer-theme="dark"] .segmented-btn{color:#94a3b8}
+    html[data-beamer-theme="dark"] .segmented-btn:hover{background:#1e293b}
+    html[data-beamer-theme="dark"] .segmented-btn.is-active{background:#334155;color:#fff;box-shadow:none}
+    html[data-beamer-theme="dark"] .chip-menu-btn.is-active::after{color:#fff}
+
+    @media (max-width:760px){
+      .settings-panel{width:min(320px,calc(100vw - .8rem))}
+    }
+  </style>
+
 </head>
 <body>
   <!-- Top bar / Toolbar -->
@@ -985,7 +1038,6 @@
         <button id="newSaveBtn" type="button" class="btn btn-primary" title="Create a new empty save">NEW</button>
         <button id="undoBtn" type="button" class="btn toolbar-action-btn" aria-label="Rückgängig" title="Rückgängig" disabled>↶</button>
         <button id="randomBtn" type="button" class="btn toolbar-action-btn" aria-label="Zufälligen Chip auswählen" title="Zufälligen Chip auswählen">🎲</button>
-        <button id="themeBtn" type="button" class="btn toolbar-action-btn" aria-label="Beamer-Dunkelmodus" aria-pressed="false" title="Beamer-Dunkelmodus">◐</button>
         <button id="presentBtn" type="button" class="btn toolbar-action-btn" aria-label="Präsentationsmodus" aria-pressed="false" title="Präsentationsmodus (Esc zum Beenden)">⛶</button>
         <button id="voteBtn" type="button" class="btn toolbar-action-btn" aria-label="Voting" aria-pressed="false" title="Voting an/aus · Shift+Klick auf Chip: Stimme abziehen · Rechtsklick hier: Stimmen zurücksetzen">🗳</button>
         <button id="timerBtn" type="button" class="btn toolbar-action-btn" aria-haspopup="true" aria-expanded="false" aria-label="Timer" title="Timer">⏱</button>
@@ -993,6 +1045,7 @@
           <div class="timer-panel-title">Prüfungstimer</div>
           <div id="timerDisplay" class="timer-panel-display">45:00</div>
           <div id="timerStateLine" class="timer-state-line">Bereit</div>
+          <div class="menu-section-title">Dauer</div>
           <div class="timer-config-row">
             <label for="timerMinutes">Minuten</label>
             <input id="timerMinutes" class="timer-minutes" type="number" min="1" max="600" step="1" value="45" inputmode="numeric" />
@@ -1003,6 +1056,7 @@
             <button type="button" class="timer-preset" data-minutes="45">45</button>
             <button type="button" class="timer-preset" data-minutes="90">90</button>
           </div>
+          <div class="menu-section-title">Steuerung</div>
           <div class="timer-actions">
             <button id="timerStartPause" type="button" class="btn btn-primary">Start</button>
             <button id="timerReset" type="button" class="btn">Reset</button>
@@ -1011,15 +1065,35 @@
         </div>
         <button id="settingsBtn" type="button" class="btn settings-btn" aria-haspopup="true" aria-expanded="false" aria-label="Einstellungen" title="Einstellungen">⚙</button>
         <div id="settingsPanel" class="settings-panel" hidden>
-          <div class="settings-title">Chip-Abstände</div>
-          <label class="settings-row" for="chipPadding">
-            <span class="settings-row-head"><span>Padding</span><output id="chipPaddingValue">4 / 8 px</output></span>
-            <input id="chipPadding" type="range" min="1" max="12" step="0.5" value="4" />
-          </label>
-          <label class="settings-row" for="chipMargin">
-            <span class="settings-row-head"><span>Margin</span><output id="chipMarginValue">2 px</output></span>
-            <input id="chipMargin" type="range" min="0" max="16" step="1" value="2" />
-          </label>
+          <div class="settings-title">Einstellungen</div>
+          <div class="settings-section">
+            <div class="menu-section-title">Darstellung</div>
+            <div class="settings-choice-row">
+              <span>Form</span>
+              <div class="segmented-control" role="group" aria-label="Form der Chips">
+                <button id="shapeRounded" class="segmented-btn" type="button" aria-pressed="false">Rechteck</button>
+                <button id="shapePill" class="segmented-btn" type="button" aria-pressed="false">Pill</button>
+              </div>
+            </div>
+            <div class="settings-choice-row">
+              <span>Beamer</span>
+              <div class="segmented-control" role="group" aria-label="Beamer-Darstellung">
+                <button id="themeLightBtn" class="segmented-btn" type="button" aria-pressed="false">Hell</button>
+                <button id="themeDarkBtn" class="segmented-btn" type="button" aria-pressed="false">Dunkel</button>
+              </div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <div class="menu-section-title">Abstände</div>
+            <label class="settings-row" for="chipPadding">
+              <span class="settings-row-head"><span>Padding</span><output id="chipPaddingValue">4 / 8 px</output></span>
+              <input id="chipPadding" type="range" min="1" max="12" step="0.5" value="4" />
+            </label>
+            <label class="settings-row" for="chipMargin">
+              <span class="settings-row-head"><span>Margin</span><output id="chipMarginValue">2 px</output></span>
+              <input id="chipMargin" type="range" min="0" max="16" step="1" value="2" />
+            </label>
+          </div>
         </div>
       </div>
       <div class="font-controls">
@@ -1027,9 +1101,10 @@
         <div class="export-controls">
           <button id="exportBtn" type="button" class="btn" aria-haspopup="true" aria-expanded="false" title="Board exportieren">Export ▾</button>
           <div id="exportMenu" class="export-menu" hidden role="menu" aria-label="Exportformat">
-            <button type="button" class="export-menu-btn" data-export-format="json" role="menuitem">JSON</button>
-            <button type="button" class="export-menu-btn" data-export-format="png" role="menuitem">PNG</button>
-            <button type="button" class="export-menu-btn" data-export-format="svg" role="menuitem">SVG</button>
+            <div class="menu-section-title">Export</div>
+            <button type="button" class="export-menu-btn" data-export-format="json" role="menuitem"><strong>JSON</strong><span>Backup</span></button>
+            <button type="button" class="export-menu-btn" data-export-format="png" role="menuitem"><strong>PNG</strong><span>Bild</span></button>
+            <button type="button" class="export-menu-btn" data-export-format="svg" role="menuitem"><strong>SVG</strong><span>Vektor</span></button>
           </div>
         </div>
         <button id="decFont" class="btn hint" data-hint="Smaller font (F-)" type="button">F-</button>
@@ -1053,7 +1128,7 @@
             <label class="label" title="Give new chips a random background color"><input id="randColor" type="checkbox" checked> Color</label>
             <label class="label" title="Automatically prepend an emoji based on the text"><input id="autoEmoji" type="checkbox"> Emoji</label>
             <button id="reEmoji" type="button" title="Add or remove emojis on all existing chips" class="btn">Emoji</button>
-            <label class="label" style="gap:.35rem" title="Adjust pill base size"><span>Size</span>
+            <label class="label" style="gap:.35rem" title="Adjust chip base size"><span>Size</span>
               <input id="chipSize" type="range" min="0.6" max="6" step="0.005" value="1" />
             </label>
             <button id="masonryToggle" type="button" class="btn" title="Toggle dense masonry packing for chips">Masonry</button>
@@ -1215,6 +1290,16 @@
     function applyBeamerTheme(mode, persist = true){
       const dark = mode === 'dark';
       document.documentElement.dataset.beamerTheme = dark ? 'dark' : 'light';
+      const themeLightBtn = document.getElementById('themeLightBtn');
+      const themeDarkBtn = document.getElementById('themeDarkBtn');
+      if(themeLightBtn){
+        themeLightBtn.classList.toggle('is-active', !dark);
+        themeLightBtn.setAttribute('aria-pressed', String(!dark));
+      }
+      if(themeDarkBtn){
+        themeDarkBtn.classList.toggle('is-active', dark);
+        themeDarkBtn.setAttribute('aria-pressed', String(dark));
+      }
       if(themeBtn){
         themeBtn.setAttribute('aria-pressed', String(dark));
         themeBtn.textContent = dark ? '☀' : '◐';
@@ -2302,10 +2387,12 @@
       chipMenu.hidden = true;
       chipMenu.setAttribute('role','menu');
       chipMenu.innerHTML = `
+        <div class="chip-menu-section-title">Chip</div>
         <button type="button" class="chip-menu-btn" data-action="edit">✎ Bearbeiten</button>
         <button type="button" class="chip-menu-btn" data-action="pin">📌 Anpinnen</button>
         <div class="chip-menu-sep"></div>
-        <button type="button" class="chip-menu-btn" data-group=""><span class="chip-menu-dot"></span>Keine Gruppe</button>
+        <div class="chip-menu-section-title">Gruppe</div>
+        <button type="button" class="chip-menu-btn" data-group=""><span class="chip-menu-dot"></span>Ohne Gruppe</button>
         <button type="button" class="chip-menu-btn" data-group="pro"><span class="chip-menu-dot pro"></span>Pro</button>
         <button type="button" class="chip-menu-btn" data-group="contra"><span class="chip-menu-dot contra"></span>Contra</button>
         <button type="button" class="chip-menu-btn" data-group="fragen"><span class="chip-menu-dot fragen"></span>Fragen</button>`;
@@ -2885,6 +2972,10 @@
           timerPanel.hidden = true;
           if(timerBtn) timerBtn.setAttribute('aria-expanded','false');
         }
+        if(exportMenu){
+          exportMenu.hidden = true;
+          if(exportBtn) exportBtn.setAttribute('aria-expanded','false');
+        }
         setSettingsOpen(settingsPanel.hidden);
       });
       settingsPanel.addEventListener('click', event => event.stopPropagation());
@@ -2910,6 +3001,10 @@
         applyBeamerTheme(dark ? 'light' : 'dark');
       });
     }
+    const themeLightBtn = document.getElementById('themeLightBtn');
+    const themeDarkBtn = document.getElementById('themeDarkBtn');
+    if(themeLightBtn) themeLightBtn.addEventListener('click', () => applyBeamerTheme('light'));
+    if(themeDarkBtn) themeDarkBtn.addEventListener('click', () => applyBeamerTheme('dark'));
     if(presentBtn){
       presentBtn.addEventListener('click', () => {
         const active = document.documentElement.classList.contains('presentation-mode');
@@ -2933,6 +3028,10 @@
         if(open && settingsPanel){
           settingsPanel.hidden = true;
           if(settingsBtn) settingsBtn.setAttribute('aria-expanded','false');
+        }
+        if(open && exportMenu){
+          exportMenu.hidden = true;
+          if(exportBtn) exportBtn.setAttribute('aria-expanded','false');
         }
       };
       timerBtn.addEventListener('click', event => {
@@ -3034,7 +3133,7 @@
       const height = boardHeight + pad * 2;
       const dark = document.documentElement.dataset.beamerTheme === 'dark';
       const background = dark ? '#05070b' : (getComputedStyle(document.body).backgroundColor || '#f6f7fb');
-      const shape = document.documentElement.dataset.chipShape || 'pill';
+      const shape = document.documentElement.dataset.chipShape || 'rounded';
 
       const svg = svgNode('svg', {
         xmlns:'http://www.w3.org/2000/svg',
@@ -3193,7 +3292,16 @@
       };
       exportBtn.addEventListener('click', event => {
         event.stopPropagation();
-        setExportOpen(exportMenu.hidden);
+        const opening = exportMenu.hidden;
+        if(opening && settingsPanel){
+          settingsPanel.hidden = true;
+          if(settingsBtn) settingsBtn.setAttribute('aria-expanded','false');
+        }
+        if(opening && timerPanel){
+          timerPanel.hidden = true;
+          if(timerBtn) timerBtn.setAttribute('aria-expanded','false');
+        }
+        setExportOpen(opening);
       });
       exportMenu.addEventListener('click', async event => {
         event.stopPropagation();
@@ -3319,33 +3427,20 @@
     (() => {
       const CHIP_SHAPE_KEY = 'discussion.chipShape.v1';
       const root = document.documentElement;
-      const group = document.querySelector('.options-row .control-group');
-      if(!group) return;
-
-      const control = document.createElement('div');
-      control.className = 'shape-control';
-      control.setAttribute('role', 'group');
-      control.setAttribute('aria-label', 'Form der Chips');
-      control.innerHTML = '<span class="shape-label">Form</span>' +
-        '<button id="shapePill" class="shape-btn" type="button">Pill</button>' +
-        '<button id="shapeRounded" class="shape-btn" type="button" title="Rechteck abgerundet">Rechteck</button>';
-
-      const masonry = document.getElementById('masonryToggle');
-      group.insertBefore(control, masonry || null);
-
       const pillBtn = document.getElementById('shapePill');
       const roundedBtn = document.getElementById('shapeRounded');
+      if(!pillBtn || !roundedBtn) return;
 
       const readShape = () => {
         try{
-          return localStorage.getItem(CHIP_SHAPE_KEY) === 'rounded' ? 'rounded' : 'pill';
+          return localStorage.getItem(CHIP_SHAPE_KEY) === 'pill' ? 'pill' : 'rounded';
         }catch(_){
-          return 'pill';
+          return 'rounded';
         }
       };
 
       const applyShape = (shape, persist = true) => {
-        const next = shape === 'rounded' ? 'rounded' : 'pill';
+        const next = shape === 'pill' ? 'pill' : 'rounded';
         root.dataset.chipShape = next;
         pillBtn.classList.toggle('is-active', next === 'pill');
         roundedBtn.classList.toggle('is-active', next === 'rounded');
