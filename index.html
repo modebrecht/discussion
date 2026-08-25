@@ -568,6 +568,18 @@
     }
   </style>
 
+
+  <style>
+    /* ===== Compact chip density ===== */
+    .chip{
+      padding:calc(.34rem * var(--chip-font-scale, 1)) calc(.72rem * var(--chip-font-scale, 1));
+    }
+    #list{
+      padding-top:6px;
+      padding-bottom:12px;
+    }
+  </style>
+
 </head>
 <body>
   <!-- Top bar / Toolbar -->
@@ -610,7 +622,7 @@
               <input id="chipSize" type="range" min="0.6" max="6" step="0.005" value="1" />
             </label>
             <label class="label" style="gap:.35rem" title="Adjust spacing between pills"><span>Spacing</span>
-              <input id="chipMargin" type="range" min="0" max="32" step="1" value="8" />
+              <input id="chipMargin" type="range" min="0" max="32" step="1" value="4" />
             </label>
             <button id="masonryToggle" type="button" class="btn" title="Toggle dense masonry packing for chips">Masonry</button>
             <button id="oneLineToggle" type="button" class="btn" title="Show chips in a single vertical column">OneLine</button>
@@ -646,7 +658,7 @@
     const SAVE_STORAGE_KEY = 'discussion.saves.v1';
     const SETTINGS_KEY = 'discussion.settings.v1';
     const EXPORT_FILENAME = 'discussion-chips.json';
-    const layoutConfig = { step: 4, gutter: 8, chipScale: 1, mode: 'flow' };
+    const layoutConfig = { step: 4, gutter: 4, chipScale: 1, mode: 'flow' };
     const SPOTLIGHT_STEPS = [0, 0.3, 0.6, 0.9, 1.2, 1.5];
     const CHIP_SPOTLIGHT_CLASS = 'chip-spotlight';
     const CHIP_SPOTLIGHT_PAD = 48;
@@ -773,7 +785,7 @@
       });
     }
 
-    const defaultSettings = { chipScale: 1, gutter: 8 };
+    const defaultSettings = { chipScale: 1, gutter: 4 };
     const sliderBounds = {
       size: chipSizeInput ? {
         min: parseFloat(chipSizeInput.min) || defaultSettings.chipScale,
@@ -813,6 +825,11 @@
     }
 
     const uiSettings = loadSettings();
+    const COMPACT_SPACING_MIGRATION_KEY = 'discussion.compactSpacing.v1';
+    if(readStorage(COMPACT_SPACING_MIGRATION_KEY) !== '1'){
+      if(Number(uiSettings.gutter) === 8) uiSettings.gutter = 4;
+      writeStorage(COMPACT_SPACING_MIGRATION_KEY, '1');
+    }
     layoutConfig.gutter = clampNumber(uiSettings.gutter, sliderBounds.margin.min, sliderBounds.margin.max);
     layoutConfig.step = Math.max(2, Math.min(8, Math.round(layoutConfig.gutter / 2))) || layoutConfig.step;
     if(chipMarginInput) chipMarginInput.value = String(Math.round(layoutConfig.gutter));
