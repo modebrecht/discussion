@@ -1,4 +1,4 @@
-name: Apply color sequence and beamer width
+name: Apply compact chip density
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
           ref: main
 
       - name: Apply focused patch
-        run: python .github/apply_color_width.py
+        run: python .github/apply_compact_chips.py
 
       - name: Commit patch
         run: |
@@ -27,5 +27,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Avoid consecutive chip colors and widen beamer layout [skip ci]"
+          git commit -m "Compact chip padding and masonry spacing [skip ci]"
           git push origin HEAD:main
