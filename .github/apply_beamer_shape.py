@@ -1,0 +1,133 @@
+from pathlib import Path
+
+path = Path('index.html')
+text = path.read_text(encoding='utf-8')
+marker = '/* ===== Beamer full-width + chip shape ===== */'
+if marker in text:
+    raise SystemExit(0)
+
+style = r'''
+  <style>
+    /* ===== Beamer full-width + chip shape ===== */
+    .toolbar-inner,
+    .container{
+      width:100%;
+      max-width:none;
+    }
+
+    .container{
+      padding-left:clamp(.9rem,1.5vw,1.5rem);
+      padding-right:clamp(.9rem,1.5vw,1.5rem);
+    }
+
+    main > section:last-child{width:100%}
+
+    .shape-control{
+      min-height:34px;
+      display:inline-flex;
+      align-items:center;
+      overflow:hidden;
+      border:1px solid #dbe3ee;
+      border-radius:12px;
+      background:#f8fafc;
+      box-shadow:0 2px 7px rgba(15,23,42,.04);
+    }
+    .shape-label{
+      padding:0 .62rem;
+      color:#64748b;
+      font-size:.78rem;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .shape-btn{
+      min-height:32px;
+      border:0;
+      border-left:1px solid #e2e8f0;
+      border-radius:0;
+      background:transparent;
+      color:#334155;
+      padding:.38rem .68rem;
+      font:700 .82rem/1 ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;
+      cursor:pointer;
+      transition:background-color .16s ease,color .16s ease,box-shadow .16s ease;
+    }
+    .shape-btn:hover{background:#fff}
+    .shape-btn.is-active{
+      background:#0f172a;
+      color:#fff;
+      box-shadow:inset 0 0 0 1px rgba(15,23,42,.08);
+    }
+    .shape-btn:focus-visible{
+      position:relative;
+      z-index:1;
+      outline:none;
+      box-shadow:var(--ring);
+    }
+
+    html[data-chip-shape="pill"] .chip{border-radius:999px}
+    html[data-chip-shape="rounded"] .chip{border-radius:16px}
+
+    @media (max-width:760px){
+      .container{padding-left:.8rem;padding-right:.8rem}
+      .shape-label{padding-inline:.52rem}
+      .shape-btn{padding-inline:.58rem}
+    }
+  </style>
+'''
+
+script = r'''
+  <script>
+    (() => {
+      const CHIP_SHAPE_KEY = 'discussion.chipShape.v1';
+      const root = document.documentElement;
+      const group = document.querySelector('.options-row .control-group');
+      if(!group) return;
+
+      const control = document.createElement('div');
+      control.className = 'shape-control';
+      control.setAttribute('role', 'group');
+      control.setAttribute('aria-label', 'Form der Chips');
+      control.innerHTML = '<span class="shape-label">Form</span>' +
+        '<button id="shapePill" class="shape-btn" type="button">Pill</button>' +
+        '<button id="shapeRounded" class="shape-btn" type="button" title="Rechteck abgerundet">Rechteck</button>';
+
+      const masonry = document.getElementById('masonryToggle');
+      group.insertBefore(control, masonry || null);
+
+      const pillBtn = document.getElementById('shapePill');
+      const roundedBtn = document.getElementById('shapeRounded');
+
+      const readShape = () => {
+        try{
+          return localStorage.getItem(CHIP_SHAPE_KEY) === 'rounded' ? 'rounded' : 'pill';
+        }catch(_){
+          return 'pill';
+        }
+      };
+
+      const applyShape = (shape, persist = true) => {
+        const next = shape === 'rounded' ? 'rounded' : 'pill';
+        root.dataset.chipShape = next;
+        pillBtn.classList.toggle('is-active', next === 'pill');
+        roundedBtn.classList.toggle('is-active', next === 'rounded');
+        pillBtn.setAttribute('aria-pressed', String(next === 'pill'));
+        roundedBtn.setAttribute('aria-pressed', String(next === 'rounded'));
+        if(persist){
+          try{ localStorage.setItem(CHIP_SHAPE_KEY, next); }catch(_){}
+        }
+        if(typeof scheduleLayout === 'function') scheduleLayout();
+      };
+
+      pillBtn.addEventListener('click', () => applyShape('pill'));
+      roundedBtn.addEventListener('click', () => applyShape('rounded'));
+      applyShape(readShape(), false);
+    })();
+  </script>
+'''
+
+if '</head>' not in text or '</body>' not in text:
+    raise SystemExit('Expected HTML markers not found')
+
+text = text.replace('</head>', style + '\n</head>', 1)
+text = text.replace('</body>', script + '\n</body>', 1)
+path.write_text(text, encoding='utf-8')
