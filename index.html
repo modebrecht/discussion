@@ -580,6 +580,44 @@
     }
   </style>
 
+
+  <style>
+    /* ===== Chip spacing settings ===== */
+    .save-controls{position:relative}
+    .settings-btn{min-height:42px;white-space:nowrap}
+    .settings-panel{
+      position:absolute;
+      z-index:100;
+      top:calc(100% + .55rem);
+      right:0;
+      width:min(300px,calc(100vw - 1rem));
+      padding:.8rem;
+      border:1px solid #dbe3ee;
+      border-radius:16px;
+      background:#fff;
+      box-shadow:0 18px 45px rgba(15,23,42,.16);
+      display:grid;
+      gap:.75rem;
+    }
+    .settings-panel[hidden]{display:none}
+    .settings-title{font-size:.82rem;font-weight:800;color:#0f172a}
+    .settings-row{display:grid;gap:.38rem;color:#334155;font-size:.82rem;font-weight:700}
+    .settings-row-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+    .settings-row output{color:#64748b;font-variant-numeric:tabular-nums;font-weight:700}
+    .settings-row input[type="range"]{
+      width:100%;
+      height:22px;
+      margin:0;
+      accent-color:#0891b2;
+      cursor:pointer;
+    }
+    .chip{padding:var(--chip-pad-y,4px) var(--chip-pad-x,8px)}
+    @media (max-width:760px){
+      .settings-btn{padding-inline:.65rem}
+      .settings-panel{right:-.2rem}
+    }
+  </style>
+
 </head>
 <body>
   <!-- Top bar / Toolbar -->
@@ -593,6 +631,18 @@
         <label for="saveSelect" class="sr-only">Current save</label>
         <select id="saveSelect" class="save-select" title="Current save"></select>
         <button id="newSaveBtn" type="button" class="btn btn-primary" title="Create a new empty save">NEW</button>
+        <button id="settingsBtn" type="button" class="btn settings-btn" aria-haspopup="true" aria-expanded="false" title="Chip settings">⚙ Einstellungen</button>
+        <div id="settingsPanel" class="settings-panel" hidden>
+          <div class="settings-title">Chip-Abstände</div>
+          <label class="settings-row" for="chipPadding">
+            <span class="settings-row-head"><span>Padding</span><output id="chipPaddingValue">4 / 8 px</output></span>
+            <input id="chipPadding" type="range" min="1" max="12" step="0.5" value="4" />
+          </label>
+          <label class="settings-row" for="chipMargin">
+            <span class="settings-row-head"><span>Margin</span><output id="chipMarginValue">2 px</output></span>
+            <input id="chipMargin" type="range" min="0" max="16" step="1" value="2" />
+          </label>
+        </div>
       </div>
       <div class="font-controls">
         <button id="importBtn" type="button" class="btn" title="Import chips from a file">Import</button>
@@ -621,9 +671,6 @@
             <label class="label" style="gap:.35rem" title="Adjust pill base size"><span>Size</span>
               <input id="chipSize" type="range" min="0.6" max="6" step="0.005" value="1" />
             </label>
-            <label class="label" style="gap:.35rem" title="Adjust spacing between pills"><span>Spacing</span>
-              <input id="chipMargin" type="range" min="0" max="32" step="1" value="4" />
-            </label>
             <button id="masonryToggle" type="button" class="btn" title="Toggle dense masonry packing for chips">Masonry</button>
             <button id="oneLineToggle" type="button" class="btn" title="Show chips in a single vertical column">OneLine</button>
             <input id="importFile" type="file" accept="application/json" style="display:none">
@@ -651,6 +698,11 @@
     const oneLineToggleBtn = document.getElementById('oneLineToggle');
     const chipSizeInput = document.getElementById('chipSize');
     const chipMarginInput = document.getElementById('chipMargin');
+    const chipPaddingInput = document.getElementById('chipPadding');
+    const chipPaddingValue = document.getElementById('chipPaddingValue');
+    const chipMarginValue = document.getElementById('chipMarginValue');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsPanel = document.getElementById('settingsPanel');
     const saveSelect = document.getElementById('saveSelect');
     const newSaveBtn = document.getElementById('newSaveBtn');
 
@@ -658,7 +710,7 @@
     const SAVE_STORAGE_KEY = 'discussion.saves.v1';
     const SETTINGS_KEY = 'discussion.settings.v1';
     const EXPORT_FILENAME = 'discussion-chips.json';
-    const layoutConfig = { step: 4, gutter: 4, chipScale: 1, mode: 'flow' };
+    const layoutConfig = { step: 4, gutter: 2, chipScale: 1, mode: 'flow' };
     const SPOTLIGHT_STEPS = [0, 0.3, 0.6, 0.9, 1.2, 1.5];
     const CHIP_SPOTLIGHT_CLASS = 'chip-spotlight';
     const CHIP_SPOTLIGHT_PAD = 48;
@@ -785,13 +837,18 @@
       });
     }
 
-    const defaultSettings = { chipScale: 1, gutter: 4 };
+    const defaultSettings = { chipScale: 1, gutter: 2, chipPadding: 4 };
     const sliderBounds = {
       size: chipSizeInput ? {
         min: parseFloat(chipSizeInput.min) || defaultSettings.chipScale,
         max: parseFloat(chipSizeInput.max) || defaultSettings.chipScale,
         step: parseFloat(chipSizeInput.step) || 0.005
       } : { min: defaultSettings.chipScale, max: defaultSettings.chipScale, step: 0.005 },
+      padding: chipPaddingInput ? {
+        min: parseFloat(chipPaddingInput.min) || 1,
+        max: parseFloat(chipPaddingInput.max) || 12,
+        step: parseFloat(chipPaddingInput.step) || 0.5
+      } : { min: 1, max: 12, step: 0.5 },
       margin: chipMarginInput ? {
         min: parseFloat(chipMarginInput.min) || defaultSettings.gutter,
         max: parseFloat(chipMarginInput.max) || defaultSettings.gutter,
@@ -819,7 +876,8 @@
       if(!settingsReady) return;
       const payload = {
         chipScale: Number(chipScale.toFixed(3)),
-        gutter: Math.round(layoutConfig.gutter)
+        gutter: Math.round(layoutConfig.gutter),
+        chipPadding: Number(chipPadding.toFixed(1))
       };
       writeStorage(SETTINGS_KEY, JSON.stringify(payload));
     }
@@ -830,9 +888,35 @@
       if(Number(uiSettings.gutter) === 8) uiSettings.gutter = 4;
       writeStorage(COMPACT_SPACING_MIGRATION_KEY, '1');
     }
+    const DENSE_SPACING_MIGRATION_KEY = 'discussion.compactSpacing.v2';
+    if(readStorage(DENSE_SPACING_MIGRATION_KEY) !== '1'){
+      if(Number(uiSettings.gutter) === 4) uiSettings.gutter = 2;
+      writeStorage(DENSE_SPACING_MIGRATION_KEY, '1');
+    }
+    const initialChipPadding = Number(uiSettings.chipPadding);
+    let chipPadding = Number.isFinite(initialChipPadding)
+      ? clampNumber(initialChipPadding, sliderBounds.padding.min, sliderBounds.padding.max)
+      : defaultSettings.chipPadding;
+    const applyChipPadding = (value, { persist = true } = {}) => {
+      const numeric = Number(value);
+      if(!Number.isFinite(numeric)) return;
+      const step = sliderBounds.padding.step || 0.5;
+      const clamped = clampNumber(numeric, sliderBounds.padding.min, sliderBounds.padding.max);
+      chipPadding = Math.round(clamped / step) * step;
+      const vertical = Number(chipPadding.toFixed(1));
+      const horizontal = Number((chipPadding * 2).toFixed(1));
+      document.documentElement.style.setProperty('--chip-pad-y', vertical + 'px');
+      document.documentElement.style.setProperty('--chip-pad-x', horizontal + 'px');
+      if(chipPaddingInput) chipPaddingInput.value = String(vertical);
+      if(chipPaddingValue) chipPaddingValue.textContent = vertical + ' / ' + horizontal + ' px';
+      refreshChipMetrics();
+      if(persist) persistSettings();
+    };
+    applyChipPadding(chipPadding, { persist: false });
     layoutConfig.gutter = clampNumber(uiSettings.gutter, sliderBounds.margin.min, sliderBounds.margin.max);
     layoutConfig.step = Math.max(2, Math.min(8, Math.round(layoutConfig.gutter / 2))) || layoutConfig.step;
     if(chipMarginInput) chipMarginInput.value = String(Math.round(layoutConfig.gutter));
+    if(chipMarginValue) chipMarginValue.textContent = Math.round(layoutConfig.gutter) + ' px';
 
     function layoutMasonry(wraps, {
       padLeft,
@@ -1054,6 +1138,7 @@
       if(chipMarginInput){
         chipMarginInput.value = String(clamped);
       }
+      if(chipMarginValue) chipMarginValue.textContent = clamped + ' px';
       scheduleLayout();
       return true;
     };
@@ -1070,6 +1155,10 @@
         applyChipScale();
         persistSettings();
       });
+    }
+
+    if (chipPaddingInput){
+      chipPaddingInput.addEventListener('input', () => applyChipPadding(chipPaddingInput.value));
     }
 
     if (chipMarginInput){
@@ -1794,6 +1883,22 @@
     settingsReady = true;
     persistSettings();
     updateLayoutModeUI();
+
+    if(settingsBtn && settingsPanel){
+      const setSettingsOpen = (open) => {
+        settingsPanel.hidden = !open;
+        settingsBtn.setAttribute('aria-expanded', String(open));
+      };
+      settingsBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setSettingsOpen(settingsPanel.hidden);
+      });
+      settingsPanel.addEventListener('click', event => event.stopPropagation());
+      document.addEventListener('click', () => setSettingsOpen(false));
+      document.addEventListener('keydown', event => {
+        if(event.key === 'Escape') setSettingsOpen(false);
+      });
+    }
 
     if(saveSelect){
       saveSelect.addEventListener('change', ()=>activateSave(saveSelect.value));
