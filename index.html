@@ -584,7 +584,7 @@
   <style>
     /* ===== Chip spacing settings ===== */
     .save-controls{position:relative}
-    .settings-btn{min-height:42px;white-space:nowrap}
+    .settings-btn{min-height:42px;width:42px;padding:0;display:grid;place-items:center;white-space:nowrap;font-size:1rem}
     .settings-panel{
       position:absolute;
       z-index:100;
@@ -613,7 +613,7 @@
     }
     .chip{padding:var(--chip-pad-y,4px) var(--chip-pad-x,8px)}
     @media (max-width:760px){
-      .settings-btn{padding-inline:.65rem}
+      .settings-btn{width:40px;padding:0}
       .settings-panel{right:-.2rem}
     }
   </style>
@@ -631,7 +631,7 @@
         <label for="saveSelect" class="sr-only">Current save</label>
         <select id="saveSelect" class="save-select" title="Current save"></select>
         <button id="newSaveBtn" type="button" class="btn btn-primary" title="Create a new empty save">NEW</button>
-        <button id="settingsBtn" type="button" class="btn settings-btn" aria-haspopup="true" aria-expanded="false" title="Chip settings">⚙ Einstellungen</button>
+        <button id="settingsBtn" type="button" class="btn settings-btn" aria-haspopup="true" aria-expanded="false" aria-label="Einstellungen" title="Einstellungen">⚙</button>
         <div id="settingsPanel" class="settings-panel" hidden>
           <div class="settings-title">Chip-Abstände</div>
           <label class="settings-row" for="chipPadding">
