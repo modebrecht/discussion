@@ -1,0 +1,50 @@
+name: Apply emoji mode
+
+on:
+  push:
+    paths:
+      - .github/workflows/apply-emoji-mode.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Apply focused emoji patch
+        run: python .github/apply_emoji_mode.py
+
+      - name: Syntax check scripts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('index.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script>(.*?)</script>', text, flags=re.S)
+          Path('/tmp/discussion-main.js').write_text('\n'.join(scripts), encoding='utf-8')
+          PY
+          node --check /tmp/discussion-main.js
+
+      - name: Assert emoji mode cleanup
+        run: |
+          ! grep -q 'id="autoEmoji"' index.html
+          ! grep -q "key:'autoEmoji'" index.html
+          grep -q 'discussion.emojiMode.v1' index.html
+          grep -q 'function setEmojiMode' index.html
+          grep -q 'if(!emojiMode) return label' index.html
+
+      - name: Commit result
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Replace Auto-Emoji with persisted Emoji mode [skip ci]"
+          git push origin HEAD:main
