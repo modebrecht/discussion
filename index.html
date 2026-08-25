@@ -618,6 +618,85 @@
     }
   </style>
 
+
+  <style>
+    /* ===== Classroom feature pack ===== */
+    .toolbar-action-btn{
+      width:42px;
+      min-width:42px;
+      min-height:42px;
+      padding:0;
+      display:grid;
+      place-items:center;
+      font-size:1rem;
+      line-height:1;
+    }
+    .toolbar-action-btn:disabled{opacity:.38;cursor:not-allowed;transform:none;box-shadow:none}
+    .btn-wrap[data-badge]::after{
+      content:attr(data-badge);
+      position:absolute;
+      z-index:6;
+      top:-8px;
+      right:-7px;
+      min-width:20px;
+      height:20px;
+      padding:0 3px;
+      display:grid;
+      place-items:center;
+      border:1px solid rgba(15,23,42,.14);
+      border-radius:999px;
+      background:rgba(255,255,255,.96);
+      box-shadow:0 3px 9px rgba(15,23,42,.14);
+      font-size:11px;
+      line-height:1;
+      pointer-events:none;
+    }
+    .chip-pinned{box-shadow:0 0 0 2px rgba(15,23,42,.18),0 4px 12px rgba(15,23,42,.085),inset 0 1px 0 rgba(255,255,255,.2)}
+
+    html.presentation-mode .toolbar,
+    html.presentation-mode main > .card{display:none}
+    html.presentation-mode .container{padding-top:.15rem;padding-bottom:.2rem}
+    html.presentation-mode main > section:last-child{margin-top:0 !important}
+    html.presentation-mode #list{padding-top:2px;padding-bottom:2px}
+
+    html[data-beamer-theme="dark"] body{
+      background:#05070b;
+      color:#f8fafc;
+    }
+    html[data-beamer-theme="dark"] .toolbar{
+      background:rgba(8,12,20,.97);
+      border-bottom-color:#1e293b;
+      box-shadow:0 8px 28px rgba(0,0,0,.28);
+    }
+    html[data-beamer-theme="dark"] .title{color:#f8fafc}
+    html[data-beamer-theme="dark"] .font-controls,
+    html[data-beamer-theme="dark"] .label,
+    html[data-beamer-theme="dark"] .shape-control{background:#111827;border-color:#334155;color:#e2e8f0}
+    html[data-beamer-theme="dark"] .font-controls .btn,
+    html[data-beamer-theme="dark"] .btn:not(.btn-primary),
+    html[data-beamer-theme="dark"] .shape-btn{background:#111827;border-color:#334155;color:#e2e8f0}
+    html[data-beamer-theme="dark"] .font-controls .btn:hover,
+    html[data-beamer-theme="dark"] .btn:not(.btn-primary):hover,
+    html[data-beamer-theme="dark"] .shape-btn:hover{background:#1e293b}
+    html[data-beamer-theme="dark"] .font-pct,
+    html[data-beamer-theme="dark"] .shape-label{color:#94a3b8}
+    html[data-beamer-theme="dark"] .font-pct strong{color:#f8fafc}
+    html[data-beamer-theme="dark"] .save-select,
+    html[data-beamer-theme="dark"] .input{background:#0f172a;border-color:#334155;color:#f8fafc}
+    html[data-beamer-theme="dark"] .card{background:rgba(10,15,25,.96);border-color:#273449;box-shadow:0 18px 50px rgba(0,0,0,.32)}
+    html[data-beamer-theme="dark"] .options-row{border-top-color:#263244}
+    html[data-beamer-theme="dark"] .settings-panel{background:#0f172a;border-color:#334155;color:#e2e8f0}
+    html[data-beamer-theme="dark"] .settings-title{color:#f8fafc}
+    html[data-beamer-theme="dark"] .settings-row{color:#cbd5e1}
+    html[data-beamer-theme="dark"] .settings-row output{color:#94a3b8}
+    html[data-beamer-theme="dark"] .chip:not(.chip-colored){background:#1e293b;color:#f8fafc;border-color:#475569}
+    html[data-beamer-theme="dark"] .btn-wrap[data-badge]::after{background:#0f172a;border-color:#475569;color:#fff}
+
+    @media (max-width:760px){
+      .toolbar-action-btn{width:40px;min-width:40px;min-height:40px}
+    }
+  </style>
+
 </head>
 <body>
   <!-- Top bar / Toolbar -->
@@ -631,6 +710,10 @@
         <label for="saveSelect" class="sr-only">Current save</label>
         <select id="saveSelect" class="save-select" title="Current save"></select>
         <button id="newSaveBtn" type="button" class="btn btn-primary" title="Create a new empty save">NEW</button>
+        <button id="undoBtn" type="button" class="btn toolbar-action-btn" aria-label="Rückgängig" title="Rückgängig" disabled>↶</button>
+        <button id="randomBtn" type="button" class="btn toolbar-action-btn" aria-label="Zufälligen Chip auswählen" title="Zufälligen Chip auswählen">🎲</button>
+        <button id="themeBtn" type="button" class="btn toolbar-action-btn" aria-label="Beamer-Dunkelmodus" aria-pressed="false" title="Beamer-Dunkelmodus">◐</button>
+        <button id="presentBtn" type="button" class="btn toolbar-action-btn" aria-label="Präsentationsmodus" aria-pressed="false" title="Präsentationsmodus (Esc zum Beenden)">⛶</button>
         <button id="settingsBtn" type="button" class="btn settings-btn" aria-haspopup="true" aria-expanded="false" aria-label="Einstellungen" title="Einstellungen">⚙</button>
         <div id="settingsPanel" class="settings-panel" hidden>
           <div class="settings-title">Chip-Abstände</div>
@@ -703,6 +786,10 @@
     const chipMarginValue = document.getElementById('chipMarginValue');
     const settingsBtn = document.getElementById('settingsBtn');
     const settingsPanel = document.getElementById('settingsPanel');
+    const undoBtn = document.getElementById('undoBtn');
+    const randomBtn = document.getElementById('randomBtn');
+    const themeBtn = document.getElementById('themeBtn');
+    const presentBtn = document.getElementById('presentBtn');
     const saveSelect = document.getElementById('saveSelect');
     const newSaveBtn = document.getElementById('newSaveBtn');
 
@@ -744,6 +831,61 @@
       try { storage.removeItem(key); }
       catch (err) { console.warn('Local storage remove failed:', err); }
     };
+
+    const HISTORY_LIMIT = 30;
+    const undoStack = [];
+    const BEAMER_THEME_KEY = 'discussion.beamerTheme.v1';
+    let lastRandomChip = null;
+
+    function updateUndoButton(){
+      if(undoBtn) undoBtn.disabled = undoStack.length === 0;
+    }
+
+    function clearUndoHistory(){
+      undoStack.length = 0;
+      updateUndoButton();
+    }
+
+    function pushUndoSnapshot(){
+      if(!list) return;
+      const snapshot = {
+        chips: getChipData().map(item => ({ ...item })),
+        mode: layoutConfig.mode
+      };
+      const key = JSON.stringify(snapshot);
+      const previous = undoStack.length ? undoStack[undoStack.length - 1] : null;
+      if(previous && previous.key === key) return;
+      undoStack.push({ ...snapshot, key });
+      if(undoStack.length > HISTORY_LIMIT) undoStack.shift();
+      updateUndoButton();
+    }
+
+    function undoLastAction(){
+      const snapshot = undoStack.pop();
+      if(!snapshot){ updateUndoButton(); return; }
+      replaceChips(snapshot.chips, { persist: false, focus: false });
+      setLayoutMode(snapshot.mode, { force: true });
+      saveChips();
+      updateUndoButton();
+    }
+
+    function applyBeamerTheme(mode, persist = true){
+      const dark = mode === 'dark';
+      document.documentElement.dataset.beamerTheme = dark ? 'dark' : 'light';
+      if(themeBtn){
+        themeBtn.setAttribute('aria-pressed', String(dark));
+        themeBtn.textContent = dark ? '☀' : '◐';
+        themeBtn.title = dark ? 'Heller Beamer-Modus' : 'Beamer-Dunkelmodus';
+      }
+      if(persist) writeStorage(BEAMER_THEME_KEY, dark ? 'dark' : 'light');
+    }
+
+    function setPresentationMode(active){
+      const on = Boolean(active);
+      document.documentElement.classList.toggle('presentation-mode', on);
+      if(presentBtn) presentBtn.setAttribute('aria-pressed', String(on));
+      scheduleLayout();
+    }
 
     function saveDatePrefix(date = new Date()){
       const day = String(date.getDate()).padStart(2, '0');
@@ -1070,6 +1212,9 @@
       window.addEventListener('resize', scheduleLayout);
       list.addEventListener('dragover', handleListDragOver);
       list.addEventListener('drop', handleListDrop);
+      list.addEventListener('click', event => {
+        if(event.target === list) clearAllSpotlights();
+      });
     }
 
     const isTypingContext = (el) => {
@@ -1179,6 +1324,12 @@
       } else if (key === 'w') {
         e.preventDefault();
         adjustChipScale(chipScaleStep);
+      } else if (key === 's') {
+        const active = document.activeElement;
+        if(active && active.classList && active.classList.contains('btn-item')){
+          e.preventDefault();
+          toggleChipSpotlight(active);
+        }
       } else if (key === 'e') {
         if (!input) return;
         e.preventDefault();
@@ -1430,6 +1581,7 @@
     }
 
     function cycleChipStage(btn){
+      pushUndoSnapshot();
       const current = Number(btn.dataset.scaleStage || '0');
       const next = (current + 1) % SPOTLIGHT_STEPS.length;
       updateBaseMetrics(btn);
@@ -1450,6 +1602,28 @@
       }
     }
 
+    function syncChipBadge(btn){
+      if(!btn) return;
+      const wrap = btn.closest('.btn-wrap');
+      if(!wrap) return;
+      const badges = [];
+      if(btn.dataset.pinned === '1') badges.push('📌');
+      if(btn.classList.contains(CHIP_SPOTLIGHT_CLASS)) badges.push('★');
+      if(badges.length) wrap.dataset.badge = badges.join('');
+      else delete wrap.dataset.badge;
+    }
+
+    function clearAllSpotlights(){
+      if(!list) return;
+      list.querySelectorAll('.btn-item.' + CHIP_SPOTLIGHT_CLASS).forEach(btn => {
+        btn.classList.remove(CHIP_SPOTLIGHT_CLASS);
+        clearSpotlightTheme(btn);
+        setWrapSpotlightState(btn.closest('.btn-wrap'), 0);
+        syncChipBadge(btn);
+      });
+      scheduleLayout();
+    }
+
     function toggleChipSpotlight(btn){
       if(!btn) return;
       const host = btn.closest('.btn-wrap');
@@ -1461,18 +1635,39 @@
           clearSpotlightTheme(other);
           const otherHost = other.closest('.btn-wrap');
           setWrapSpotlightState(otherHost, 0);
+          syncChipBadge(other);
         });
       }
       if(activate){
         btn.classList.add(CHIP_SPOTLIGHT_CLASS);
         applySpotlightTheme(btn, getSpotlightBaseColor(btn));
         setWrapSpotlightState(host, CHIP_SPOTLIGHT_PAD);
+        syncChipBadge(btn);
       }else{
         btn.classList.remove(CHIP_SPOTLIGHT_CLASS);
         clearSpotlightTheme(btn);
         setWrapSpotlightState(host, 0);
+        syncChipBadge(btn);
       }
       scheduleLayout();
+    }
+
+    function toggleChipPinned(btn){
+      if(!btn) return;
+      pushUndoSnapshot();
+      const pinned = btn.dataset.pinned !== '1';
+      if(pinned){
+        btn.dataset.pinned = '1';
+        btn.classList.add('chip-pinned');
+      }else{
+        delete btn.dataset.pinned;
+        btn.classList.remove('chip-pinned');
+      }
+      syncChipBadge(btn);
+      restoreCreationOrder();
+      syncStackDragState();
+      scheduleLayout();
+      saveChips();
     }
 
     function registerChipDragHandlers(btn){
@@ -1488,7 +1683,7 @@
 
     function syncChipDragCapability(btn){
       if(!btn) return;
-      if(layoutConfig.mode === 'stack'){
+      if(layoutConfig.mode === 'stack' && btn.dataset.pinned !== '1'){
         btn.setAttribute('draggable', 'true');
       }else{
         btn.removeAttribute('draggable');
@@ -1505,7 +1700,7 @@
         wrap.classList.remove('dragging', 'drop-target');
         const btn = wrap.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : null;
         if(!btn) return;
-        if(enable){
+        if(enable && btn.dataset.pinned !== '1'){
           btn.setAttribute('draggable', 'true');
         }else{
           btn.removeAttribute('draggable');
@@ -1667,12 +1862,16 @@
       btn.dataset.label = label;
       btn.dataset.scaleStage = '0';
       btn.dataset.metrics = '0';
+      if(options.pinned){
+        btn.dataset.pinned = '1';
+        btn.classList.add('chip-pinned');
+      }
       btn.textContent = maybeAddEmoji(label);
       if(typeof options.displayText === 'string') btn.textContent = options.displayText;
       registerChipDragHandlers(btn);
       syncChipDragCapability(btn);
       if(chipResizeObserver) chipResizeObserver.observe(btn);
-      btn.title='Click to cycle size (+30%, +60%, +90%, +120%, +150%). Shift+Click resets. Press Delete to remove';
+      btn.title='Click: Grösse · Shift+Click: Reset · Ctrl/Cmd+Click oder S: Spotlight · Rechtsklick: Anpinnen · Delete: Löschen';
       if(options.color){
         setChipColor(btn, options.color);
       }else if(!options.skipRandom && randToggle && randToggle.checked){
@@ -1680,6 +1879,12 @@
       }else{
         clearChipColor(btn);
       }
+      syncChipBadge(btn);
+      btn.addEventListener('contextmenu',(event)=>{
+        event.preventDefault();
+        toggleChipPinned(btn);
+        btn.focus();
+      });
       btn.addEventListener('click',(event)=>{
         if(event.ctrlKey || event.metaKey){
           event.preventDefault();
@@ -1691,6 +1896,7 @@
           event.preventDefault();
           const currentStage = Number(btn.dataset.scaleStage || '0');
           if(currentStage !== 0){
+            pushUndoSnapshot();
             updateBaseMetrics(btn);
             applyStageToChip(btn, 0);
             scheduleLayout();
@@ -1709,6 +1915,7 @@
           e.preventDefault();
           const host=btn.closest('.btn-wrap');
           if(host){
+            pushUndoSnapshot();
             if(chipResizeObserver) chipResizeObserver.unobserve(btn);
             host.remove();
             scheduleLayout();
@@ -1729,6 +1936,11 @@
 
     function restoreCreationOrder(){
       sortWrapsBy((a, b) => {
+        const aChip = a.firstElementChild instanceof HTMLElement ? a.firstElementChild : null;
+        const bChip = b.firstElementChild instanceof HTMLElement ? b.firstElementChild : null;
+        const aPinned = Boolean(aChip && aChip.dataset.pinned === '1');
+        const bPinned = Boolean(bChip && bChip.dataset.pinned === '1');
+        if(aPinned !== bPinned) return aPinned ? -1 : 1;
         const aOrder = Number(a.dataset.createdAt || '0');
         const bOrder = Number(b.dataset.createdAt || '0');
         if(!Number.isFinite(aOrder) && !Number.isFinite(bOrder)) return 0;
@@ -1769,6 +1981,23 @@
       }
     }
 
+    function spotlightRandomChip(){
+      if(!list) return;
+      const chips = Array.from(list.querySelectorAll('.btn-item'));
+      if(!chips.length) return;
+      let pool = chips;
+      if(chips.length > 1 && lastRandomChip){
+        const filtered = chips.filter(chip => chip !== lastRandomChip);
+        if(filtered.length) pool = filtered;
+      }
+      const target = pool[Math.floor(Math.random() * pool.length)];
+      clearAllSpotlights();
+      toggleChipSpotlight(target);
+      target.focus({ preventScroll: true });
+      try{ target.scrollIntoView({ behavior:'smooth', block:'center', inline:'center' }); }catch(_){}
+      lastRandomChip = target;
+    }
+
     function getChipData(){
       if(!list) return [];
       const payload = [];
@@ -1782,7 +2011,8 @@
           color: btn.dataset.color || null,
           scaleStage: Number(btn.dataset.scaleStage || '0'),
           display: btn.textContent || '',
-          order: Number.isFinite(orderValue) ? orderValue : null
+          order: Number.isFinite(orderValue) ? orderValue : null,
+          pinned: btn.dataset.pinned === '1'
         });
       });
       return payload;
@@ -1806,7 +2036,8 @@
         color: item.color || undefined,
         skipRandom: true,
         displayText: display,
-        createdAt: Number.isFinite(orderNumeric) ? orderNumeric : undefined
+        createdAt: Number.isFinite(orderNumeric) ? orderNumeric : undefined,
+        pinned: Boolean(item.pinned)
       });
       list.appendChild(node);
       const btn=node.querySelector('.btn-item');
@@ -1839,6 +2070,7 @@
       if(typeof id !== 'string' || id === saveState.activeId) return;
       if(!saveState.saves.some(save => save.id === id)) return;
       saveChips();
+      clearUndoHistory();
       saveState.activeId = id;
       persistSaveState();
       renderSaveSelector();
@@ -1848,6 +2080,7 @@
 
     function createNewSave(){
       saveChips();
+      clearUndoHistory();
       const newSave = {
         id: makeSaveId(),
         name: nextSaveName(saveState.saves),
@@ -1863,6 +2096,7 @@
     function addFromInput(){
       const value=input.value.trim();
       if(!value) return;
+      pushUndoSnapshot();
       const node=createChip(value);
       list.appendChild(node);
       scheduleLayout();
@@ -1872,6 +2106,7 @@
     }
     function clearAllChips(){
       if(!list) return;
+      if(list.children.length) pushUndoSnapshot();
       list.innerHTML='';
       chipSequence = 0;
       scheduleLayout();
@@ -1883,6 +2118,8 @@
     settingsReady = true;
     persistSettings();
     updateLayoutModeUI();
+    updateUndoButton();
+    applyBeamerTheme(readStorage(BEAMER_THEME_KEY) === 'dark' ? 'dark' : 'light', false);
 
     if(settingsBtn && settingsPanel){
       const setSettingsOpen = (open) => {
@@ -1906,6 +2143,21 @@
 
     if(newSaveBtn){
       newSaveBtn.addEventListener('click', createNewSave);
+    }
+
+    if(undoBtn) undoBtn.addEventListener('click', undoLastAction);
+    if(randomBtn) randomBtn.addEventListener('click', spotlightRandomChip);
+    if(themeBtn){
+      themeBtn.addEventListener('click', () => {
+        const dark = document.documentElement.dataset.beamerTheme === 'dark';
+        applyBeamerTheme(dark ? 'light' : 'dark');
+      });
+    }
+    if(presentBtn){
+      presentBtn.addEventListener('click', () => {
+        const active = document.documentElement.classList.contains('presentation-mode');
+        setPresentationMode(!active);
+      });
     }
 
     if(masonryToggleBtn){
@@ -1957,6 +2209,7 @@
             const text = reader.result;
             const parsed = JSON.parse(typeof text === 'string' ? text : '');
             if(!Array.isArray(parsed)) throw new Error('Invalid JSON');
+            pushUndoSnapshot();
             replaceChips(parsed);
           }catch(err){
             console.warn('Import failed:', err);
@@ -1996,6 +2249,7 @@
         const btn = active;
         const host = btn.closest('.btn-wrap');
         if(host){
+          pushUndoSnapshot();
           if(chipResizeObserver) chipResizeObserver.unobserve(btn);
           host.remove();
           scheduleLayout();
@@ -2011,6 +2265,7 @@
       reEmojiBtn.addEventListener('click', ()=>{
         const buttons=Array.from(list.querySelectorAll('.btn-item'));
         const removeEmojis=buttons.some(btn=>startsWithEmoji(btn.textContent||''));
+        if(buttons.length) pushUndoSnapshot();
         let changed=0;
         buttons.forEach(btn=>{
           const txt=btn.textContent||'';
